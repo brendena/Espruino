@@ -188,7 +188,9 @@ void lcdFlip_SPILCD(JsGraphics *gfx) {
 
   bool hasOverlay = false;
   GfxDrawImageInfo overlayImg;
-  if (lcdOverlayImage)
+ 
+#if LCD_BPP==12 || LCD_BPP==16
+   if (lcdOverlayImage)
     hasOverlay = _jswrap_graphics_parseImage(gfx, lcdOverlayImage, 0, &overlayImg);
 
   if (hasOverlay) {
@@ -202,7 +204,7 @@ void lcdFlip_SPILCD(JsGraphics *gfx) {
     gfx->data.modMinX = 0;
     gfx->data.modMaxX = LCD_WIDTH-1;
   }
-#if LCD_BPP==12 || LCD_BPP==16
+
   // Just send full rows as this allows us to issue a single SPI
   // transfer.
   // TODO: could swap to a transfer per row if we're filling less than half a row

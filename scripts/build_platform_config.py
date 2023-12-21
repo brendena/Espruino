@@ -399,6 +399,8 @@ if "USB" in board.devices:
   if "pin_disc" in board.devices["USB"]: codeOutDevicePin("USB", "pin_disc", "USB_DISCONNECT_PIN")
   if "pin_vsense" in board.devices["USB"]: codeOutDevicePin("USB", "pin_vsense", "USB_VSENSE_PIN")
 
+
+# this can all be boiled down to a list.  So then you don't have to triverse it
 if "LCD" in board.devices:
   codeOut("#define LCD_CONTROLLER_"+board.devices["LCD"]["controller"].upper())
   if "width" in board.devices["LCD"]:
@@ -423,6 +425,26 @@ if "LCD" in board.devices:
       codeOutDevicePin("LCD", "pin_rs", "LCD_FSMC_RS")
     if "pin_reset" in board.devices["LCD"]:
       codeOutDevicePin("LCD", "pin_reset", "LCD_RESET")
+      
+  if "pin_mosi" in board.devices["LCD"]:
+    codeOutDevicePin("LCD", "pin_mosi", "LCD_SPI_MOSI")
+    
+  if "pin_sck" in board.devices["LCD"]:
+    codeOutDevicePin("LCD", "pin_sck", "LCD_SPI_SCK")
+    
+  if "pin_cs" in board.devices["LCD"]:
+    codeOutDevicePin("LCD", "pin_cs", "LCD_SPI_CS")
+    
+  if "pin_dc" in board.devices["LCD"]:
+    codeOutDevicePin("LCD", "pin_dc", "LCD_SPI_DC")
+    
+  if "pin_rst" in board.devices["LCD"]:
+    codeOutDevicePin("LCD", "pin_rst", "LCD_SPI_RST")
+    
+  if "pin_extcomin" in board.devices["LCD"]:
+    codeOutDevicePin("LCD", "pin_extcomin", "LCD_EXTCOMIN")
+  
+    
   if board.devices["LCD"]["controller"]=="ssd1306" or board.devices["LCD"]["controller"]=="st7567" or board.devices["LCD"]["controller"]=="st7789v" or board.devices["LCD"]["controller"]=="st7735" or board.devices["LCD"]["controller"]=="gc9a01":
     codeOutDevicePin("LCD", "pin_mosi", "LCD_SPI_MOSI")
     codeOutDevicePin("LCD", "pin_sck", "LCD_SPI_SCK")
