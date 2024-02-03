@@ -22,10 +22,15 @@ ifdef PAD_FOR_BOOTLOADER
 endif
 
 gdb:
-	@echo "target extended-remote :4242" > gdbinit
+	@echo "target extended-remote :3333" > gdbinit
 	@echo "file $(PROJ_NAME).elf" >> gdbinit
-	#echo "load" >> gdbinit
-	@echo "break main" >> gdbinit
+	@echo "load bin/espruino_2v19.88_p8_SDK12_SD30_SPIFLASH.hex" >> gdbinit
+	@echo "load bin/espruino_2v19.88_p8_SDK12_SD30_SPIFLASH.elf" >> gdbinit
+#	@echo "break graphicsFillRect" >> gdbinit
+#	@echo "break ./libs/banglejs/jswrap_bangle.c:1528" >> gdbinit
 	@echo "break HardFault_Handler" >> gdbinit
-	$(GDB) -x gdbinit
-	rm gdbinit
+#	@echo "break flush_chunk_buffer" >> gdbinit
+	
+	@echo $(GDB)
+#	$(GDB) -x gdbinit
+	./gcc-arm-none-eabi-8-2018-q4-major/bin/arm-none-eabi-gdb -x gdbinit

@@ -45,6 +45,8 @@
 #include "bluetooth.h" // for self-test
 #include "jsi2c.h" // accelerometer/etc
 
+#include "pineTime/pineTimeDevice.h"
+
 
 /*TYPESCRIPT
 declare const BTN1: Pin;
@@ -567,14 +569,15 @@ const char *lockReason = 0; ///< If JSBT_LOCK/UNLOCK is set, this is the reason 
 void _jswrap_banglejs_setLocked(bool isLocked, const char *reason);
 
 void jswrap_banglejs_pwrGPS(bool on) {
-  return 0;
+
 }
 
 void jswrap_banglejs_pwrHRM(bool on) {
-  return 0;
+
 }
 
 void jswrap_banglejs_pwrBacklight(bool on) {
+  jshPinOutput(LCD_BL, on);
 }
 
 void graphicsInternalFlip() {
@@ -621,8 +624,10 @@ void peripheralPollHandler() {
 }
 
 void backlightOnHandler() {
+  jswrap_banglejs_pwrBacklight(true); 
 }
 void backlightOffHandler() {
+  jswrap_banglejs_pwrBacklight(false); 
 }
 
 void btnHandlerCommon(int button, bool state, IOEventFlags flags) {
@@ -711,6 +716,7 @@ to be shorter than the power timeout.
 */
 /// Turn just the backlight on or off (or adjust brightness)
 void jswrap_banglejs_setLCDPowerBacklight(bool isOn) {
+  jswrap_banglejs_pwrBacklight(isOn);
 }
 
 /*JSON{
@@ -1510,8 +1516,28 @@ NO_INLINE void jswrap_banglejs_setTheme() {
   "type" : "hwinit",
   "generate" : "jswrap_banglejs_hwinit"
 }*/
-NO_INLINE void jswrap_banglejs_hwinit() {
+//first function i think!
 
+
+NO_INLINE void jswrap_banglejs_hwinit() {
+  #ifdef NRF52832
+    jswrap_ble_setTxPower(4);
+  #endif
+
+  
+  graphicsStructInit(&graphicsInternal, LCD_WIDTH, LCD_HEIGHT, LCD_BPP);
+  
+  setupBangleHw(&graphicsInternal);
+  
+//setup graphics
+  graphicsSetCallbacks(&graphicsInternal);
+// set default graphics themes - before we even start to load settings.json
+  jswrap_banglejs_setTheme();
+//set screen to to default color
+
+  //needs a delay for some reason?
+  jshDelayMicroseconds(4000000);
+  graphicsInternal.fillRect(&graphicsInternal,0,0,LCD_WIDTH,LCD_HEIGHT,graphicsTheme.bg);
 }
 
 /*JSON{
@@ -1519,6 +1545,26 @@ NO_INLINE void jswrap_banglejs_hwinit() {
   "generate" : "jswrap_banglejs_init"
 }*/
 NO_INLINE void jswrap_banglejs_init() {
+  IOEventFlags channel;
+  bool firstRun = jsiStatus & JSIS_FIRST_BOOT; 
+
+  jswrap_banglejs_setLCDOffset(0);
+  graphicsStructResetState(&graphicsInternal);
+
+    // Create backing graphics object for LCD
+  JsVar *graphics = jspNewObject(0, "Graphics");
+  // if there's nothing in the Graphics object, we assume it's for the built-in graphics
+  if (!graphics) return; // low memory
+  // add it as a global var
+  jsvObjectSetChild(execInfo.root, "g", graphics);
+  jsvObjectSetChild(execInfo.hiddenRoot, JS_GRAPHICS_VAR, graphics);
+  graphicsInternal.graphicsVar = graphics;
+
+  // Create 'flip' fn
+  JsVar *fn = jsvNewNativeFunction((void (*)(void))lcd_flip, JSWAT_VOID|JSWAT_THIS_ARG|(JSWAT_BOOL << (JSWAT_BITS*1)));
+  jsvObjectSetChildAndUnLock(graphics,"flip",fn);
+
+  //splash screen
 }
 
 /*JSON{
@@ -1565,7 +1611,7 @@ void _jswrap_banglejs_i2cWr(JshI2CInfo *i2c, int i2cAddr, JsVarInt reg, JsVarInt
 
 JsVar *_jswrap_banglejs_i2cRd(JshI2CInfo *i2c, int i2cAddr, JsVarInt reg, JsVarInt cnt) {
 
-  unsigned char buf[128];
+  unsigned char buf[128] ={0};
   return jsvNewFromInteger(buf[0]);
 }
 
@@ -1691,7 +1737,7 @@ void jswrap_banglejs_compassWr(JsVarInt reg, JsVarInt data) {
 Read a register on the Magnetometer/Compass
 */
 JsVar *jswrap_banglejs_compassRd(JsVarInt reg, JsVarInt cnt) {
-
+  return NULL;
 }
 
 /*JSON{
@@ -1878,7 +1924,9 @@ static void jswrap_banglejs_periph_off() {
 
 // True if a button/charge input/etc should wake the Bangle from being off
 static bool _jswrap_banglejs_shouldWake() {
+  return false;
 }
+
 
 /*JSON{
     "type" : "staticmethod",
@@ -2322,36 +2370,7 @@ On Bangle.js there are no LEDs, so to remain compatible with example code that
 might expect an LED, this is an object that behaves like a pin, but which just
 displays a circle on the display
 */
-/*JSON{
-    "type" : "variable",
-    "name" : "LED1",
-    "generate_js" : "libs/js/banglejs/LED1.min.js",
-    "return" : ["JsVar","A `Pin` object for a fake LED which appears on "],
-    "ifdef" : "BANGLEJS", "no_docs":1
-}
 
-On most Espruino board there are LEDs, in which case `LED1` will be an actual
-Pin.
-
-On Bangle.js there are no LEDs, so to remain compatible with example code that
-might expect an LED, this is an object that behaves like a pin, but which just
-displays a circle on the display
-*/
-/*JSON{
-    "type" : "variable",
-    "name" : "LED2",
-    "generate_js" : "libs/js/banglejs/LED2.min.js",
-    "return" : ["JsVar","A `Pin` object for a fake LED which appears on "],
-    "ifdef" : "BANGLEJS", "no_docs":1
-}
-
-On most Espruino board there are LEDs, in which case `LED2` will be an actual
-Pin.
-
-On Bangle.js there are no LEDs, so to remain compatible with example code that
-might expect an LED, this is an object that behaves like a pin, but which just
-displays a circle on the display
-*/
 
 /*TYPESCRIPT
 type SetUIArg<Mode> = Mode | {

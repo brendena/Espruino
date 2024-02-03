@@ -971,7 +971,8 @@ void jshInit() {
 
 #ifndef SAVE_ON_FLASH
   // Get a random seed to put into rand's random number generator
-  srand(jshGetRandomNumber());
+  //srand(jshGetRandomNumber());
+  srand(35);
 #endif
 
 #ifdef NRF_USB

@@ -11,6 +11,7 @@
  * Contains JavaScript Graphics Draw Functions
  * ----------------------------------------------------------------------------
  */
+#pragma once
 
 #include "jsvar.h"
 #include "graphics.h"

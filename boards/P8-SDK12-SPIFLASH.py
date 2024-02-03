@@ -27,30 +27,36 @@ info = {
 # 'default_console_rx' : "D8",
 # 'default_console_baudrate' : "38400",
  'variables' : 2565, # SD5.0 0x200014B8 SD 3.0 0x200019C0  How many variables are allocated for Espruino to use. RAM will be overflowed if this number is too high and code won't compile.
- 'bootloader' : 1,
+ 'bootloader' : 0,
  'binary_name' : 'espruino_%v_p8_SDK12_SD30_SPIFLASH.hex',
  'build' : {
    'optimizeflags' : '-Os',
    'libraries' : [
      'BLUETOOTH',
-#     'NET',
      'GRAPHICS',
-#     'NFC',
-#     'NEOPIXEL'
+     'LCD_SPI_UNBUF'
+     #'LCD_SPI',
    ],
    'makefile' : [
 #    'SAVE_ON_FLASH=1',
 #     'DEFINES+=-DCONFIG_GPIO_AS_PINRESET', # Allow the reset pin to work
      'DEFINES+= -DUSE_FONT_6X8 -DBLE_HIDS_ENABLED=1 -DBLUETOOTH_NAME_PREFIX=\'"P8"\'',
-     'USE_LCD_SPI_UNBUF=1',
-     'DEFINES+= -DSPISENDMANY_BUFFER_SIZE=126',
+     'DEFINES+= -DUSE_LCD_SPI_UNBUF ',
+     'DEFINES+= -DSPISENDMANY_BUFFER_SIZE=1024',
      'DEFINES += -DSPIFLASH_SHARED_SPI',
      'DFU_PRIVATE_KEY=targets/nrf5x_dfu/dfu_private_key.pem',
      'NRF_BL_DFU_INSECURE=1',
-     'DFU_SETTINGS=--application-version 0xff --hw-version 52 --sd-req 0x8C,0x91'
+     'DFU_SETTINGS=--application-version 0xff --hw-version 52 --sd-req 0x8C,0x91',
+     #     needed to add banglejs to the build
+#     order matters
+     'DEFINES += -DBANGLEJS',
+     'INCLUDE += -I$(ROOT)/libs/banglejs -I$(ROOT)/libs/misc',
+     'WRAPPERSOURCES += libs/banglejs/jswrap_bangle.c',
+#    new settings
+     'DEFINES+=-DESPR_GRAPHICS_INTERNAL=1', #used for internal displays
    ]
  }
-};
+}
 
 
 chip = {
@@ -77,15 +83,8 @@ chip = {
 };
 
 devices = {
- 'BTN1' : { 'pin' : 'D17', 'pinstate' : 'IN_PULLDOWN' },
-#  'BTN2' : { 'pin' : 'D14', 'pinstate' : 'IN_PULLDOWN' }, # Pin negated in software
-#  'BTN3' : { 'pin' : 'D15', 'pinstate' : 'IN_PULLDOWN' }, # Pin negated in software
-#  'BTN4' : { 'pin' : 'D16', 'pinstate' : 'IN_PULLDOWN' }, # Pin negated in software
+  'BTN1' : { 'pin' : 'D13', 'pinstate' : 'IN_PULLDOWN' },
   'LED1' : { 'pin' : 'D27' },
-#  'LED2' : { 'pin' : 'D18' }, # Pin negated in software
-#  'LED3' : { 'pin' : 'D19' }, # Pin negated in software
-#  'LED4' : { 'pin' : 'D20' }, # Pin negated in software
-  # Pin D22 is used for clock when driving neopixels - as not specifying a pin seems to break things
   'VIBRATE' : { 'pin' : 'D16' }, # Pin negated in software
   'BAT' : {
             'pin_charging' : 'D19', # inverted
@@ -99,7 +98,24 @@ devices = {
             'pin_cs' : 'D5',
             'size' : 4096*1024, # 4MB
             'memmap_base' : 0x60000000 # map into the address space (in software)
-  }
+  },
+  'LCD' : {
+      'width' : 240, 'height' : 240, 
+      'bpp' : 16, 
+      # Not sure its the V version?
+      # Other internal devices use the ST7789V so we'll try it
+      'controller' : 'ST7789V', 
+      'pin_cs' : 'D25',
+      'pin_rst' : 'D26',
+      'pin_sck' : 'D2',
+      'pin_mosi' : 'D3',
+      'pin_miso' : 'D4',
+      'pin_dc' : 'D18', 
+      #D23, Light1
+      #D22, Light2
+      #D14, Light3
+      'pin_bl' : 'D22'
+    },
 };
 
 # left-right, or top-bottom order

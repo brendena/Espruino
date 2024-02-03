@@ -2239,7 +2239,7 @@ typedef struct {
 void _jswrap_graphics_stringMetrics(JsGraphics *gfx, JsVar *var, int lineStartIndex, StringMetricsResult *result) {
   JsGraphicsFontInfo info;
   _jswrap_graphics_getFontInfo(gfx, &info);
-  memset(result, 0, sizeof(result));
+  memset(result, 0, sizeof(StringMetricsResult));
 
   int fontHeight = _jswrap_graphics_getFontHeightInternal(gfx, &info);
   JsVar *str = jsvAsString(var);
@@ -3459,7 +3459,7 @@ JsVar *jswrap_graphics_drawImage(JsVar *parent, JsVar *image, int xPos, int yPos
           _jswrap_drawImageLayerStartX(&l);
           _jswrap_drawImageLayerStartX(&l2);
           for (x = x1; x <= x2 ; x++) {
-            uint32_t ca,cb,cc,cd;
+            unsigned int ca,cb,cc,cd;
             bool nonTransparent = true;
             nonTransparent &= _jswrap_drawImageLayerGetPixel(&l, &ca);
             l.qx += sx;

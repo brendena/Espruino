@@ -34,7 +34,7 @@ info = {
    'libraries' : [
      'BLUETOOTH',
      'GRAPHICS',
-     #'LCD_SPI', #memory LCD is slightly different.  It for stuff like Pebble watch 
+          #'LCD_SPI', #memory LCD is slightly different.  It for stuff like Pebble watch 
      'LCD_SPI_UNBUF',
      'GRAPHICS',
    ],
@@ -46,7 +46,7 @@ info = {
      'DFU_PRIVATE_KEY=targets/nrf5x_dfu/dfu_private_key.pem',
      'NRF_BL_DFU_INSECURE=1',
      'DFU_SETTINGS=--application-version 0xff --hw-version 52 --sd-req 0x8C,0x91',
-     'NRF_SDK12=1'
+      'NRF_SDK12=1'
    ]
  }
 };
@@ -74,7 +74,6 @@ chip = {
 #    'flash_available' : 512 - ((31 + 8 + 2 + 10)*4) # Softdevice 3.0 uses 31 pages of flash, bootloader 8, FS 2, code 10. Each page is 4 kb.
 #    'flash_available' : 512 - ((35 + 8 + 2 + 16)*4) # Softdevice 5.0  uses 35 pages of flash, bootloader 8, FS 2, code 10. Each page is 4 kb.
   },
-
 };
 
 devices = {
