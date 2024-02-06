@@ -24,12 +24,13 @@ endif
 gdb:
 	@echo "target extended-remote :3333" > gdbinit
 	@echo "file $(PROJ_NAME).elf" >> gdbinit
-	@echo "load bin/espruino_2v19.88_p8_SDK12_SD30_SPIFLASH.hex" >> gdbinit
-	@echo "load bin/espruino_2v19.88_p8_SDK12_SD30_SPIFLASH.elf" >> gdbinit
+	@echo "load bin/espruino_2v19.89_p8_SDK12_SD30_SPIFLASH.hex" >> gdbinit
+	@echo "load bin/espruino_2v19.89_p8_SDK12_SD30_SPIFLASH.elf" >> gdbinit
 #	@echo "break graphicsFillRect" >> gdbinit
 #	@echo "break ./libs/banglejs/jswrap_bangle.c:1528" >> gdbinit
 	@echo "break HardFault_Handler" >> gdbinit
 #	@echo "break flush_chunk_buffer" >> gdbinit
+	@echo "continue" >> gdbinit
 	
 	@echo $(GDB)
 #	$(GDB) -x gdbinit

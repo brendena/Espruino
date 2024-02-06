@@ -2,7 +2,6 @@
 *.pyc
 jswrap_bangle_real.c
 jswrap_bangle_stripped.c
-ARM.make
 log.log
 gdbinit
 /gen/*

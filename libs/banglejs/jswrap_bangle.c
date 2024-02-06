@@ -45,7 +45,10 @@
 #include "bluetooth.h" // for self-test
 #include "jsi2c.h" // accelerometer/etc
 
-#include "pineTime/pineTimeDevice.h"
+#include "hardware/pineTimeDevice.h"
+#include "hardware/display/bangle_lcd.h"
+#include "bangle_defines.h"
+#include "bangle_time.h"
 
 
 /*TYPESCRIPT
@@ -559,6 +562,8 @@ Can be used for housekeeping tasks that don't want to be run during the day.
 // =========================================================================
 
 
+volatile JsBangleFlags bangleFlags = JSBF_NONE;
+JsBangleTasks bangleTasks;
 
 /// Nordic app timer to handle call of peripheralPollHandler
 APP_TIMER_DEF(m_peripheral_poll_timer_id);
@@ -566,7 +571,6 @@ APP_TIMER_DEF(m_peripheral_poll_timer_id);
 
 
 const char *lockReason = 0; ///< If JSBT_LOCK/UNLOCK is set, this is the reason (if known) - should point to a constant string (not on stack!)
-void _jswrap_banglejs_setLocked(bool isLocked, const char *reason);
 
 void jswrap_banglejs_pwrGPS(bool on) {
 
@@ -576,9 +580,7 @@ void jswrap_banglejs_pwrHRM(bool on) {
 
 }
 
-void jswrap_banglejs_pwrBacklight(bool on) {
-  jshPinOutput(LCD_BL, on);
-}
+
 
 void graphicsInternalFlip() {
 }
@@ -623,12 +625,7 @@ void peripheralPollHandler() {
 
 }
 
-void backlightOnHandler() {
-  jswrap_banglejs_pwrBacklight(true); 
-}
-void backlightOffHandler() {
-  jswrap_banglejs_pwrBacklight(false); 
-}
+
 
 void btnHandlerCommon(int button, bool state, IOEventFlags flags) {
 
@@ -680,44 +677,8 @@ void touchHandler(bool state, IOEventFlags flags) {
 }
 
 
-static void jswrap_banglejs_setLCDPowerController(bool isOn) {
-}
 
-static void backlightFadeHandler() {
-}
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "setBacklight",
-    "generate" : "jswrap_banglejs_setLCDPowerBacklight",
-    "params" : [
-      ["isOn","bool","True if the LCD backlight should be on, false if not"]
-    ],
-    "ifdef" : "BANGLEJS"
-}
-This function can be used to turn Bangle.js's LCD backlight off or on.
-
-This function resets the Bangle's 'activity timer' (like pressing a button or
-the screen would) so after a time period of inactivity set by
-`Bangle.setOptions({backlightTimeout: X});` the backlight will turn off.
-
-If you want to keep the backlight on permanently (until apps are changed) you can
-do:
-
-```
-Bangle.setOptions({backlightTimeout: 0}) // turn off the timeout
-Bangle.setBacklight(1); // keep screen on
-```
-
-Of course, the backlight depends on `Bangle.setLCDPower` too, so any lcdPowerTimeout/setLCDTimeout will
-also turn the backlight off. The use case is when you require the backlight timeout
-to be shorter than the power timeout.
-*/
-/// Turn just the backlight on or off (or adjust brightness)
-void jswrap_banglejs_setLCDPowerBacklight(bool isOn) {
-  jswrap_banglejs_pwrBacklight(isOn);
-}
 
 /*JSON{
     "type" : "staticmethod",
@@ -750,170 +711,12 @@ using `Bangle.setLCDBrightness`.
 void jswrap_banglejs_setLCDPower(bool isOn) {
 }
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "setLCDBrightness",
-    "generate" : "jswrap_banglejs_setLCDBrightness",
-    "params" : [
-      ["brightness","float","The brightness of Bangle.js's display - from 0(off) to 1(on full)"]
-    ],
-    "ifdef" : "BANGLEJS"
-}
-This function can be used to adjust the brightness of Bangle.js's display, and
-hence prolong its battery life.
 
-Due to hardware design constraints, software PWM has to be used which means that
-the display may flicker slightly when Bluetooth is active and the display is not
-at full power.
 
-**Power consumption**
 
-* 0 = 7mA
-* 0.1 = 12mA
-* 0.2 = 18mA
-* 0.5 = 28mA
-* 0.9 = 40mA (switching overhead)
-* 1 = 40mA
-*/
-void jswrap_banglejs_setLCDBrightness(JsVarFloat v) {
-}
 
-/*TYPESCRIPT
-type LCDMode =
-  | "direct"
-  | "doublebuffered"
-  | "120x120"
-  | "80x80"
-*/
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "setLCDMode",
-    "generate" : "jswrap_banglejs_setLCDMode",
-    "params" : [
-      ["mode","JsVar","The LCD mode (See below)"]
-    ],
-    "ifdef" : "BANGLEJS",
-    "typescript" : "setLCDMode(mode?: LCDMode): void;"
-}
-This function can be used to change the way graphics is handled on Bangle.js.
 
-Available options for `Bangle.setLCDMode` are:
 
-* `Bangle.setLCDMode()` or `Bangle.setLCDMode("direct")` (the default) - The
-  drawable area is 240x240 16 bit. Unbuffered, so draw calls take effect
-  immediately. Terminal and vertical scrolling work (horizontal scrolling
-  doesn't).
-* `Bangle.setLCDMode("doublebuffered")` - The drawable area is 240x160 16 bit,
-  terminal and scrolling will not work. `g.flip()` must be called for draw
-  operations to take effect.
-* `Bangle.setLCDMode("120x120")` - The drawable area is 120x120 8 bit,
-  `g.getPixel`, terminal, and full scrolling work. Uses an offscreen buffer
-  stored on Bangle.js, `g.flip()` must be called for draw operations to take
-  effect.
-* `Bangle.setLCDMode("80x80")` - The drawable area is 80x80 8 bit, `g.getPixel`,
-  terminal, and full scrolling work. Uses an offscreen buffer stored on
-  Bangle.js, `g.flip()` must be called for draw operations to take effect.
-
-You can also call `Bangle.setLCDMode()` to return to normal, unbuffered
-`"direct"` mode.
-*/
-void jswrap_banglejs_setLCDMode(JsVar *mode) {
-}
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "getLCDMode",
-    "generate" : "jswrap_banglejs_getLCDMode",
-    "return" : ["JsVar","The LCD mode as a String"],
-    "ifdef" : "BANGLEJS",
-    "typescript" : "getLCDMode(): LCDMode;"
-}
-The current LCD mode.
-
-See `Bangle.setLCDMode` for examples.
-*/
-JsVar *jswrap_banglejs_getLCDMode() {
-  return NULL;
-}
-
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "setLCDOffset",
-    "generate" : "jswrap_banglejs_setLCDOffset",
-    "params" : [
-      ["y","int","The amount of pixels to shift the LCD up or down"]
-    ],
-    "ifdef" : "BANGLEJS"
-}
-This can be used to move the displayed memory area up or down temporarily. It's
-used for displaying notifications while keeping the main display contents
-intact.
-*/
-void jswrap_banglejs_setLCDOffset(int y) {
-}
-
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "setLCDOverlay",
-    "generate" : "jswrap_banglejs_setLCDOverlay",
-    "params" : [
-      ["img","JsVar","An image, or undefined to clear"],
-      ["x","int","The X offset the graphics instance should be overlaid on the screen with"],
-      ["y","int","The Y offset the graphics instance should be overlaid on the screen with"]
-    ],
-    "#if" : "defined(BANGLEJS_Q3) || defined(DICKENS)",
-    "typescript" : [
-      "setLCDOverlay(img: any, x: number, y: number): void;",
-      "setLCDOverlay(): void;"
-    ]
-}
-Overlay an image or graphics instance on top of the contents of the graphics buffer.
-
-This only works on Bangle.js 2 because Bangle.js 1 doesn't have an offscreen buffer accessible from the CPU.
-
-```
-// display an alarm clock icon on the screen
-var img = require("heatshrink").decompress(atob(`lss4UBvvv///ovBlMyqoADv/VAwlV//1qtfAQX/BINXDoPVq/9DAP
-/AYIKDrWq0oREAYPW1QAB1IWCBQXaBQWq04WCAQP6BQeqA4P1AQPq1WggEK1WrBAIkBBQJsCBYO///fBQOoPAcqCwP3BQnwgECCwP9
-GwIKCngWC14sB7QKCh4CBCwN/64KDgfACwWn6vWGwYsBCwOputWJgYsCgGqytVBQYsCLYOlqtqwAsFEINVrR4BFgghBBQosDEINWIQ
-YsDEIQ3DFgYhCG4msSYeVFgnrFhMvOAgsEkE/FhEggYWCFgIhDkEACwQKBEIYKBCwSGFBQJxCQwYhBBQTKDqohCBQhCCEIJlDXwrKE
-BQoWHBQdaCwuqJoI4CCwgKECwJ9CJgIKDq+qBYUq1WtBQf+BYIAC3/VBQX/tQKDz/9BQY5BAAVV/4WCBQJcBKwVf+oHBv4wCAAYhB`));
-Bangle.setLCDOverlay(img,66,66);
-```
-
-Or use a `Graphics` instance:
-
-```
-var ovr = Graphics.createArrayBuffer(100,100,1,{msb:true}); // 1bpp
-ovr.drawLine(0,0,100,100);
-ovr.drawRect(0,0,99,99);
-Bangle.setLCDOverlay(ovr,38,38);
-```
-
-Although `Graphics` can be specified directly, it can often make more sense to
-create an Image from the `Graphics` instance, as this gives you access
-to color palettes and transparent colors. For instance this will draw a colored
-overlay with rounded corners:
-
-```
-var ovr = Graphics.createArrayBuffer(100,100,2,{msb:true});
-ovr.setColor(1).fillRect({x:0,y:0,w:99,h:99,r:8});
-ovr.setColor(3).fillRect({x:2,y:2,w:95,h:95,r:7});
-ovr.setColor(2).setFont("Vector:30").setFontAlign(0,0).drawString("Hi",50,50);
-Bangle.setLCDOverlay({
-  width:ovr.getWidth(), height:ovr.getHeight(),
-  bpp:2, transparent:0,
-  palette:new Uint16Array([0,0,g.toColor("#F00"),g.toColor("#FFF")]),
-  buffer:ovr.buffer
-},38,38);
-```
-*/
-void jswrap_banglejs_setLCDOverlay(JsVar *imgVar, int x, int y) {
-}
 
 /*JSON{
     "type" : "staticmethod",
@@ -1079,35 +882,8 @@ JsVar *jswrap_banglejs_getOptions() {
   return _jswrap_banglejs_setOptions(NULL, true);
 }
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "isLCDOn",
-    "generate" : "jswrap_banglejs_isLCDOn",
-    "return" : ["bool","Is the display on or not?"],
-    "ifdef" : "BANGLEJS"
-}
-Also see the `Bangle.lcdPower` event
-*/
-// emscripten bug means we can't use 'bool' as return value here!
-int jswrap_banglejs_isLCDOn() {
-  return 0;
-}
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "isBacklightOn",
-    "generate" : "jswrap_banglejs_isBacklightOn",
-    "return" : ["bool","Is the backlight on or not?"],
-    "ifdef" : "BANGLEJS"
-}
-Also see the `Bangle.backlight` event
-*/
-// emscripten bug means we can't use 'bool' as return value here!
-int jswrap_banglejs_isBacklightOn() {
-  return 0;
-}
+
 
 /*JSON{
     "type" : "staticmethod",
@@ -1162,21 +938,6 @@ JsVarInt jswrap_banglejs_getBattery() {
   return 0;
 }
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "lcdWr",
-    "generate" : "jswrap_banglejs_lcdWr",
-    "params" : [
-      ["cmd","int",""],
-      ["data","JsVar",""]
-    ],
-    "ifdef" : "BANGLEJS"
-}
-Writes a command directly to the ST7735 LCD controller
-*/
-void jswrap_banglejs_lcdWr(JsVarInt cmd, JsVar *data) {
-}
 
 /*JSON{
     "type" : "staticmethod",

@@ -49,9 +49,14 @@ info = {
      'DFU_SETTINGS=--application-version 0xff --hw-version 52 --sd-req 0x8C,0x91',
      #     needed to add banglejs to the build
 #     order matters
+     'DEFINES += -DBANGLEJS_P8',
      'DEFINES += -DBANGLEJS',
      'INCLUDE += -I$(ROOT)/libs/banglejs -I$(ROOT)/libs/misc',
-     'WRAPPERSOURCES += libs/banglejs/jswrap_bangle.c',
+     'WRAPPERSOURCES += libs/banglejs/jswrap_bangle.c \
+                        libs/banglejs/bangle_time.c \
+                        libs/banglejs/bangle_hardware_changes.c \
+                        libs/banglejs/hardware/backlight/bangle_backlight.c \
+                        libs/banglejs/hardware/display/bangle_lcd.c',
 #    new settings
      'DEFINES+=-DESPR_GRAPHICS_INTERNAL=1', #used for internal displays
    ]
