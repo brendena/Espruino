@@ -45,7 +45,6 @@
 #include "bluetooth.h" // for self-test
 #include "jsi2c.h" // accelerometer/etc
 
-#include "hardware/pineTimeDevice.h"
 #include "hardware/display/bangle_lcd.h"
 #include "bangle_defines.h"
 #include "bangle_time.h"
@@ -1287,8 +1286,10 @@ NO_INLINE void jswrap_banglejs_hwinit() {
 
   
   graphicsStructInit(&graphicsInternal, LCD_WIDTH, LCD_HEIGHT, LCD_BPP);
+  graphicsInternal.data.flags = 0;
+  graphicsInternal.data.fontSize = JSGRAPHICS_FONTSIZE_6X8+1;
   
-  setupBangleHw(&graphicsInternal);
+  graphicHwSetup(&graphicsInternal);
   
 //setup graphics
   graphicsSetCallbacks(&graphicsInternal);
@@ -1308,6 +1309,13 @@ NO_INLINE void jswrap_banglejs_hwinit() {
 NO_INLINE void jswrap_banglejs_init() {
   IOEventFlags channel;
   bool firstRun = jsiStatus & JSIS_FIRST_BOOT; 
+  
+#ifndef EMULATED
+  // turn vibrate off every time Bangle is reset
+  jshPinOutput(VIBRATE_PIN,0);
+#endif
+
+
 
   jswrap_banglejs_setLCDOffset(0);
   graphicsStructResetState(&graphicsInternal);
@@ -1324,6 +1332,8 @@ NO_INLINE void jswrap_banglejs_init() {
   // Create 'flip' fn
   JsVar *fn = jsvNewNativeFunction((void (*)(void))lcd_flip, JSWAT_VOID|JSWAT_THIS_ARG|(JSWAT_BOOL << (JSWAT_BITS*1)));
   jsvObjectSetChildAndUnLock(graphics,"flip",fn);
+
+  backlight_init();
 
   //splash screen
 }

@@ -1,4 +1,5 @@
 #include "bangle_backlight.h"
+#include "jswrap_bangle.h"
 extern volatile JsBangleFlags bangleFlags;
 
 uint8_t lcdBrightness;
@@ -52,8 +53,8 @@ void jswrap_banglejs_setLCDPowerBacklight(bool isOn) {
   else {
     // ensure screen locks if programatically switch off
     
-    //if (lockTimeout > 0 && lockTimeout <= backlightTimeout) _jswrap_banglejs_setLocked(true, "backlight");
-    //bangleFlags &= ~JSBF_LCD_BL_ON;
+    if (lockTimeout > 0 && lockTimeout <= backlightTimeout) _jswrap_banglejs_setLocked(true, "backlight");
+      bangleFlags &= ~JSBF_LCD_BL_ON;
   
   }
 

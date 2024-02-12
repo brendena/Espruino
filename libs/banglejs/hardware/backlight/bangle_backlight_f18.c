@@ -23,7 +23,7 @@ void backlight_init(){
   jsble_check_error(err_code);
 }
 
-void jswrap_banglejs_kill() {
+void backlight_kill() {
   app_timer_stop(m_backlight_on_timer_id);
   app_timer_stop(m_backlight_off_timer_id);
 }

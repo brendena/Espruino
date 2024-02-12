@@ -2,38 +2,18 @@
 
 extern volatile JsBangleFlags bangleFlags;
 
+
+__attribute__((weak)) void setDefaultPowerController(bool isOn){}
+
 static void jswrap_banglejs_setLCDPowerController(bool isOn) {
-#ifdef LCD_CONTROLLER_LPM013M126
-  jshPinOutput(LCD_EXTCOMIN, 0);
-  jshPinOutput(LCD_DISP, isOn); // enable
-#endif
-#ifdef LCD_CONTROLLER_ST7789_8BIT
-  if (isOn) { // wake
-    lcdST7789_cmd(0x11, 0, NULL); // SLPOUT
-    jshDelayMicroseconds(20);
-    lcdST7789_cmd(0x29, 0, NULL); // DISPON
-  } else { // sleep
-    lcdST7789_cmd(0x28, 0, NULL); // DISPOFF
-    jshDelayMicroseconds(20);
-    lcdST7789_cmd(0x10, 0, NULL); // SLPIN
-  }
-#endif
-#if defined(LCD_CONTROLLER_ST7789V) || defined(LCD_CONTROLLER_ST7735) || defined(LCD_CONTROLLER_GC9A01)
-  // TODO: LCD_CONTROLLER_GC9A01 - has an enable/power pin
-  if (isOn) { // wake
-    lcdCmd_SPILCD(0x11, 0, NULL); // SLPOUT
-    jshDelayMicroseconds(5000);   // For GC9A01, we should wait 5ms after SLPOUT for power supply and clocks to stabilise before sending next command
-    lcdCmd_SPILCD(0x29, 0, NULL); // DISPON
-  } else { // sleep
-    lcdCmd_SPILCD(0x28, 0, NULL); // DISPOFF
-    jshDelayMicroseconds(20);
-    lcdCmd_SPILCD(0x10, 0, NULL); // SLPIN - for GC9A01, it takeds 120ms to get into sleep mode after sending SPLIN
-  }
-#endif
+  setDefaultPowerController(isOn);
 #ifdef LCD_EN
   jshPinOutput(LCD_EN,isOn); // enable off
 #endif
 }
+
+
+__attribute__((weak)) void setDefaultLcdWr(JsVarInt cmd,size_t dLen, const uint8_t * dPtr){}
 
 
 /*JSON{
@@ -51,15 +31,19 @@ Writes a command directly to the ST7735 LCD controller
 */
 void jswrap_banglejs_lcdWr(JsVarInt cmd, JsVar *data) {
   JSV_GET_AS_CHAR_ARRAY(dPtr, dLen, data);
-#ifdef LCD_CONTROLLER_ST7789_8BIT
-  lcdST7789_cmd(cmd, dLen, (const uint8_t *)dPtr);
-#endif
-#if defined(LCD_CONTROLLER_ST7789V) || defined(LCD_CONTROLLER_ST7735) || defined(LCD_CONTROLLER_GC9A01)
-  lcdCmd_SPILCD(cmd, dLen, (const uint8_t *)dPtr);
-#endif
+  setDefaultLcdWr(cmd, dLen, (const uint8_t *)dPtr);
 }
 
 
+
+__attribute__((weak)) void defaultPwrBacklight(unsigned char isOn, unsigned char lcdBrightness){
+  jswrap_banglejs_pwrBacklight(isOn && (lcdBrightness>0));
+  #ifdef LCD_BL
+  if (isOn && lcdBrightness > 0 && lcdBrightness < 255) {
+    jshPinAnalogOutput(LCD_BL, lcdBrightness/256.0, 200, JSAOF_NONE);
+  }
+  #endif // LCD_BL
+}
 /*JSON{
     "type" : "staticmethod",
     "class" : "Bangle",
@@ -109,40 +93,22 @@ void jswrap_banglejs_setLCDPowerBacklight(bool isOn) {
     if (lockTimeout > 0 && lockTimeout <= backlightTimeout) _jswrap_banglejs_setLocked(true, "backlight");
     bangleFlags &= ~JSBF_LCD_BL_ON;
   }
-#ifndef EMULATED
-#ifdef BANGLEJS_F18
-  app_timer_stop(m_backlight_on_timer_id);
-  app_timer_stop(m_backlight_off_timer_id);
-  if (isOn) { // wake
-    if (lcdBrightness > 0) {
-      if (lcdBrightness < 255) { //  only do PWM if brightness isn't full
-        app_timer_start(m_backlight_on_timer_id, APP_TIMER_TICKS(BACKLIGHT_PWM_INTERVAL, APP_TIMER_PRESCALER), NULL);
-      } else // full brightness
-        jswrap_banglejs_pwrBacklight(true); // backlight on
-    } else { // lcdBrightness == 0
-      jswrap_banglejs_pwrBacklight(false); // backlight off
+  #ifndef EMULATED
+  #if defined(ESPR_BACKLIGHT_FADE)
+    if (!lcdFadeHandlerActive) {
+      JsSysTime t = jshGetTimeFromMilliseconds(10);
+      jstExecuteFn(backlightFadeHandler, NULL, t, t, NULL);
+      lcdFadeHandlerActive = true;
+      backlightFadeHandler();
     }
-  } else { // sleep
-    jswrap_banglejs_pwrBacklight(false); // backlight off
-  }
-#elif defined(ESPR_BACKLIGHT_FADE)
-  if (!lcdFadeHandlerActive) {
-    JsSysTime t = jshGetTimeFromMilliseconds(10);
-    jstExecuteFn(backlightFadeHandler, NULL, t, t, NULL);
-    lcdFadeHandlerActive = true;
-    backlightFadeHandler();
-  }
-#else // the default backlight mode (on Bangle.js 2/others)
-  jswrap_banglejs_pwrBacklight(isOn && (lcdBrightness>0));
-#ifdef LCD_BL
-  if (isOn && lcdBrightness > 0 && lcdBrightness < 255) {
-    jshPinAnalogOutput(LCD_BL, lcdBrightness/256.0, 200, JSAOF_NONE);
-  }
-#endif // LCD_BL
-#endif
-#endif // !EMULATED
+  #else // the default backlight mode (on Bangle.js 2/others)
+    defaultPwrBacklight(isOn,lcdBrightness);
+  #endif
+  #endif // !EMULATED
 }
 
+
+/*This might be moved to the device page?*/
 /*TYPESCRIPT
 type LCDMode =
   | "direct"
@@ -183,74 +149,14 @@ Available options for `Bangle.setLCDMode` are:
 You can also call `Bangle.setLCDMode()` to return to normal, unbuffered
 `"direct"` mode.
 */
-void jswrap_banglejs_setLCDMode(JsVar *mode) {
-#ifdef LCD_CONTROLLER_ST7789_8BIT
-  LCDST7789Mode lcdMode = LCDST7789_MODE_UNBUFFERED;
-  if (jsvIsUndefined(mode) || jsvIsStringEqual(mode,"direct"))
-    lcdMode = LCDST7789_MODE_UNBUFFERED;
-  else if (jsvIsStringEqual(mode,"null"))
-    lcdMode = LCDST7789_MODE_NULL;
-  else if (jsvIsStringEqual(mode,"doublebuffered"))
-    lcdMode = LCDST7789_MODE_DOUBLEBUFFERED;
-  else if (jsvIsStringEqual(mode,"120x120"))
-    lcdMode = LCDST7789_MODE_BUFFER_120x120;
-  else if (jsvIsStringEqual(mode,"80x80"))
-    lcdMode = LCDST7789_MODE_BUFFER_80x80;
-  else
-    jsExceptionHere(JSET_ERROR,"Unknown LCD Mode %j",mode);
-
-  JsVar *graphics = jsvObjectGetChildIfExists(execInfo.hiddenRoot, JS_GRAPHICS_VAR);
-  if (!graphics) return;
-  jswrap_graphics_setFont(graphics, NULL, 1); // reset fonts - this will free any memory associated with a custom font
-  // remove the buffer if it was defined
-  jsvObjectSetOrRemoveChild(graphics, "buffer", 0);
-  unsigned int bufferSize = 0;
-  switch (lcdMode) {
-    case LCDST7789_MODE_NULL:
-    case LCDST7789_MODE_UNBUFFERED:
-      graphicsInternal.data.width = LCD_WIDTH;
-      graphicsInternal.data.height = LCD_HEIGHT;
-      graphicsInternal.data.bpp = 16;
-      break;
-    case LCDST7789_MODE_DOUBLEBUFFERED:
-      graphicsInternal.data.width = LCD_WIDTH;
-      graphicsInternal.data.height = 160;
-      graphicsInternal.data.bpp = 16;
-      break;
-    case LCDST7789_MODE_BUFFER_120x120:
-      graphicsInternal.data.width = 120;
-      graphicsInternal.data.height = 120;
-      graphicsInternal.data.bpp = 8;
-      bufferSize = 120*120;
-      break;
-    case LCDST7789_MODE_BUFFER_80x80:
-      graphicsInternal.data.width = 80;
-      graphicsInternal.data.height = 80;
-      graphicsInternal.data.bpp = 8;
-      bufferSize = 80*80;
-      break;
-  }
-  if (bufferSize) {
-    jsvGarbageCollect();
-    jsvDefragment();
-    JsVar *arrData = jsvNewFlatStringOfLength(bufferSize);
-    if (arrData) {
-      jsvObjectSetChildAndUnLock(graphics, "buffer", jsvNewArrayBufferFromString(arrData, (unsigned int)bufferSize));
-    } else {
-      jsExceptionHere(JSET_ERROR, "Not enough memory to allocate offscreen buffer");
-      jswrap_banglejs_setLCDMode(0); // go back to default mode
-      return;
-    }
-    jsvUnLock(arrData);
-  }
-  graphicsStructResetState(&graphicsInternal); // reset colour, cliprect, etc
-  jsvUnLock(graphics);
-  lcdST7789_setMode( lcdMode );
-  graphicsSetCallbacks(&graphicsInternal); // set the callbacks up after the mode change
-#else
+__attribute__((weak)) void jswrap_banglejs_setLCDMode(JsVar *mode) {
   jsExceptionHere(JSET_ERROR, "setLCDMode is unsupported on this device");
-#endif
 }
+
+
+
+/*Each display will need to support its own name's*/
+__attribute__((weak)) void getLCDModeName(const char *name){}
 
 /*JSON{
     "type" : "staticmethod",
@@ -267,25 +173,7 @@ See `Bangle.setLCDMode` for examples.
 */
 JsVar *jswrap_banglejs_getLCDMode() {
   const char *name=0;
-#ifdef LCD_CONTROLLER_ST7789_8BIT
-  switch (lcdST7789_getMode()) {
-    case LCDST7789_MODE_NULL:
-      name = "null";
-      break;
-    case LCDST7789_MODE_UNBUFFERED:
-      name = "direct";
-      break;
-    case LCDST7789_MODE_DOUBLEBUFFERED:
-      name = "doublebuffered";
-      break;
-    case LCDST7789_MODE_BUFFER_120x120:
-      name = "120x120";
-      break;
-    case LCDST7789_MODE_BUFFER_80x80:
-      name = "80x80";
-      break;
-  }
-#endif
+  getLCDModeName(name);
   if (!name) return 0;
   return jsvNewFromString(name);
 }
@@ -304,11 +192,10 @@ This can be used to move the displayed memory area up or down temporarily. It's
 used for displaying notifications while keeping the main display contents
 intact.
 */
-void jswrap_banglejs_setLCDOffset(int y) {
-#ifdef LCD_CONTROLLER_ST7789_8BIT
-  lcdST7789_setYOffset(y);
-#endif
-}
+__attribute__((weak)) void jswrap_banglejs_setLCDOffset(int y) {}
+
+
+__attribute__((weak)) void setDefaultSetLCDOverlay(JsVar *imgVar, int x, int y){}
 
 /*JSON{
     "type" : "staticmethod",
@@ -368,13 +255,7 @@ Bangle.setLCDOverlay({
 ```
 */
 void jswrap_banglejs_setLCDOverlay(JsVar *imgVar, int x, int y) {
-#ifdef LCD_CONTROLLER_LPM013M126
-  lcdMemLCD_setOverlay(imgVar, x, y);
-#endif
-#if defined(LCD_CONTROLLER_ST7789V) || defined(LCD_CONTROLLER_ST7735) || defined(LCD_CONTROLLER_GC9A01)
-  //haven't got to this part yet
-  //lcdSetOverlay_SPILCD(imgVar, x, y);
-#endif
+  setDefaultSetLCDOverlay(imgVar, x, y);
   // set all as modified
   // TODO: Could look at old vs new overlay state and update only lines that had changed?
   graphicsInternal.data.modMinX = 0;
@@ -397,3 +278,6 @@ Also see the `Bangle.lcdPower` event
 int jswrap_banglejs_isLCDOn() {
   return (bangleFlags&JSBF_LCD_ON)!=0;
 }
+
+
+__attribute__((weak)) void graphicHwSetup(JsGraphics * gInternal){}

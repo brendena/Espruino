@@ -1,1 +1,5 @@
-#include "hardware/backlight/pinetime_backlight.c"
+#include "hardware/backlight/bangle_backlight_p8.c"
+#include "hardware/backlight/bangle_backlight_f18.c"
+#include "hardware/display/bangle_lcd_st7789_8bit.c"
+#include "hardware/display/bangle_lcd_generic_display.c"
+#include "hardware/display/bangle_lcd_lpm013M126.c"

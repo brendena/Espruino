@@ -17,3 +17,4 @@ int jswrap_banglejs_isLCDOn();
 
 
 /*c funcs*/
+void graphicHwSetup(JsGraphics * gInternal);
