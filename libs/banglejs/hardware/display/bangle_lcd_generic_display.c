@@ -23,9 +23,11 @@ void setDefaultSetLCDOverlay(JsVar *imgVar, int x, int y){
 }
 
 void graphicHwSetup(JsGraphics * gInternal){
+#if defined(BANGLEJS_P8) 
+    graphicsInternal.data.type = JSGRAPHICSTYPE_SPILCD;
+#else
     gInternal->data.type = JSGRAPHICSTYPE_LCD_SPI_UNBUF;
-    gInternal->data.width = 240;
-    gInternal->data.height = 240;
+#endif
     lcdInit_SPILCD(gInternal);
 }
 

@@ -38,11 +38,11 @@ void jswrap_banglejs_lcdWr(JsVarInt cmd, JsVar *data) {
 
 __attribute__((weak)) void defaultPwrBacklight(unsigned char isOn, unsigned char lcdBrightness){
   jswrap_banglejs_pwrBacklight(isOn && (lcdBrightness>0));
-  #ifdef LCD_BL
+#ifdef LCD_BL
   if (isOn && lcdBrightness > 0 && lcdBrightness < 255) {
     jshPinAnalogOutput(LCD_BL, lcdBrightness/256.0, 200, JSAOF_NONE);
   }
-  #endif // LCD_BL
+#endif // LCD_BL
 }
 /*JSON{
     "type" : "staticmethod",
