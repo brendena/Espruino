@@ -68,6 +68,7 @@ info = {
      'WRAPPERSOURCES += libs/banglejs/jswrap_bangle.c',
      'WRAPPERSOURCES += libs/graphics/jswrap_font_6x15.c',
      'WRAPPERSOURCES += libs/graphics/jswrap_font_12x20.c',
+     'SOURCES += libs/banglejs/hardware/hardware_impl.c',
      'SOURCES += libs/misc/nmea.c',
      'SOURCES += libs/misc/stepcount.c',
      'SOURCES += libs/misc/hrm_vc31.c',     
