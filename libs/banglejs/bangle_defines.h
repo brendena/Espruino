@@ -18,7 +18,9 @@
 #include "stdio.h"
 #include "stdint.h"
 #include "stdbool.h"
-#include "app_timer.h"
+#ifndef EMULATED
+  #include "app_timer.h"
+#endif
 
 typedef enum {
   JSBF_NONE,

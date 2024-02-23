@@ -47,6 +47,7 @@ info = {
      'WRAPPERSOURCES += libs/graphics/jswrap_font_6x15.c',
      'WRAPPERSOURCES += libs/graphics/jswrap_font_12x20.c',
      'WRAPPERSOURCES += libs/misc/jswrap_emulated.c',
+     'SOURCES += libs/banglejs/hardware/hardware_impl.c',
      'SOURCES += libs/misc/nmea.c',
      'SOURCES += libs/misc/stepcount.c',
      'SOURCES += libs/misc/heartrate.c',

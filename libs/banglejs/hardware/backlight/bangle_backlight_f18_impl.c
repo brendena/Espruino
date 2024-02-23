@@ -1,6 +1,8 @@
 #include "bangle_backlight_impl.h"
 
-#if BANGLEJS_F18
+#ifdef BANGLEJS_F18
+#ifndef EMBEDDED
+
 APP_TIMER_DEF(m_backlight_on_timer_id);
 APP_TIMER_DEF(m_backlight_off_timer_id);
 
@@ -52,4 +54,5 @@ void backlightOffHandler() {
   banglejs_pwrBacklight_impl(false); // backlight off
 }
 
+#endif
 #endif

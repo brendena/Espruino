@@ -80,6 +80,7 @@
 #endif
 
 #include "hardware/backlight/jswrap_bangle_backlight.h"
+#include "hardware/backlight/jswrap_bangle_backlight.c"
 
 /*TYPESCRIPT
 declare const BTN1: Pin;
