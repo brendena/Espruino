@@ -1,0 +1,5 @@
+#pragma once
+
+#define DEFAULT_LCD_POWER_TIMEOUT 0 // don't turn LCD off
+#define DEFAULT_BACKLIGHT_TIMEOUT 3000
+#define DEFAULT_LOCK_TIMEOUT 5000
