@@ -4,9 +4,6 @@
 /// LCD Brightness - 255=full
 uint8_t lcdBrightness;
 
-
-
-
 /*JSON{
     "type" : "staticmethod",
     "class" : "Bangle",
