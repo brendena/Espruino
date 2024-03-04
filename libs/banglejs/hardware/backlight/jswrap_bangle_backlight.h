@@ -1,5 +1,6 @@
 #pragma once
 #include "bangle_defines.h"
+#include "bangle_state.h"
 #include "bangle_backlight_impl.h"
 #include "jswrap_bangle.h"
 #include "jsparse.h"

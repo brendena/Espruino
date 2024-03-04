@@ -141,11 +141,3 @@ typedef enum {
 #endif
 
 
-//global state
-
-extern volatile JsBangleFlags bangleFlags;
-extern bool i2cBusy;
-
-extern int backlightTimeout;
-extern volatile uint16_t inactivityTimer; // in ms
-extern int lockTimeout; // in ms

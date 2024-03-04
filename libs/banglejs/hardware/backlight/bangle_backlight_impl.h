@@ -1,5 +1,6 @@
 #pragma once
 #include "jswrap_bangle_backlight.h"
+#include "bangle_state.h"
 
 ESPR_EMULATE(void banglejs_setLCDPowerBacklight_impl(bool isOn));
 ESPR_EMULATE(void banglejs_pwrBacklight_impl(bool on));
