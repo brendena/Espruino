@@ -33,7 +33,7 @@ void banglejs_backlight_idle_impl(){
     lcdFadeHandlerActive = false;
     if (!(bangleFlags&JSBF_LCD_ON))
     { 
-      jswrap_banglejs_setLCDPowerController(0);
+      banglejs_setLCDPowerController_impl(0);
     }
   }
 }
