@@ -110,5 +110,22 @@ void banglejs_display_init_impl(JsGraphics *gfx){
   gfx->data.type = JSGRAPHICSTYPE_ST7789_8BIT;
   lcdST7789_init(gfx);
 }
+void graphicsInternalFlip()
+{
+  lcdST7789_flip(&graphicsInternal);
+}
 
+void banglejs_setLCDPowerController_impl(bool isOn) {
+  if (isOn) { // wake
+    lcdST7789_cmd(0x11, 0, NULL); // SLPOUT
+    jshDelayMicroseconds(20);
+    lcdST7789_cmd(0x29, 0, NULL); // DISPON
+  } else { // sleep
+    lcdST7789_cmd(0x28, 0, NULL); // DISPOFF
+    jshDelayMicroseconds(20);
+    lcdST7789_cmd(0x10, 0, NULL); // SLPIN
+  }
+}
+//don't do anything in idle
+void banglejs_display_idle_impl(){};
 #endif

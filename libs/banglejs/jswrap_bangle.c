@@ -55,9 +55,7 @@
 #ifdef LCD_CONTROLLER_ST7789_8BIT
 #include "lcd_st7789_8bit.h"
 #endif
-#if defined(LCD_CONTROLLER_ST7789V) || defined(LCD_CONTROLLER_ST7735) || defined(LCD_CONTROLLER_GC9A01)
-#include "lcd_spilcd.h"
-#endif
+
 
 #ifdef ACCEL_DEVICE_KX126
 #include "kx126_registers.h"
@@ -3441,13 +3439,7 @@ void jswrap_banglejs_kill() {
   jshPinWatch(BTN5_PININDEX, false, JSPW_NONE);
   jshSetPinShouldStayWatched(BTN5_PININDEX,false);
 #endif
-#ifdef LCD_CONTROLLER_LPM013M126
-  // ensure we remove any overlay we might have set
-  lcdMemLCD_setOverlay(NULL, 0, 0);
-#endif
-#if defined(LCD_CONTROLLER_ST7789V) || defined(LCD_CONTROLLER_ST7735) || defined(LCD_CONTROLLER_GC9A01)
-  lcdSetOverlay_SPILCD(NULL, 0, 0);
-#endif
+  banglejs_display_idle_impl();
   // Graphics var is getting removed, so set this to null.
   jsvUnLock(graphicsInternal.graphicsVar);
   graphicsInternal.graphicsVar = NULL;
@@ -3799,12 +3791,7 @@ bool jswrap_banglejs_idle() {
 #endif
   jsvUnLock(bangle);
   bangleTasks = JSBT_NONE;
-#if defined(LCD_CONTROLLER_LPM013M126) || defined(LCD_CONTROLLER_ST7789V) || defined(LCD_CONTROLLER_ST7735) || defined(LCD_CONTROLLER_GC9A01)
-  // Automatically flip!
-  if (graphicsInternal.data.modMaxX >= graphicsInternal.data.modMinX) {
-    graphicsInternalFlip();
-  }
-#endif
+  banglejs_display_idle_impl();
   banglejs_backlight_idle_impl();
   // resolve any beep/buzz promises
   if (promiseBuzz && !buzzAmt) {

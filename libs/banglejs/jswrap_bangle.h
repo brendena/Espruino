@@ -15,15 +15,8 @@
 #include "bangle_defines.h"
 #include "jspin.h"
 
-void jswrap_banglejs_lcdWr(JsVarInt cmd, JsVar *data);
-void jswrap_banglejs_setLCDPower(bool isOn);
-void jswrap_banglejs_setLCDBrightness(JsVarFloat v);
-void jswrap_banglejs_setLCDMode(JsVar *mode);
-JsVar *jswrap_banglejs_getLCDMode();
-void jswrap_banglejs_setLCDOffset(int y);
-void jswrap_banglejs_setLCDOverlay(JsVar *imgVar, int x, int y);
+
 void jswrap_banglejs_setLCDTimeout(JsVarFloat timeout);
-int jswrap_banglejs_isLCDOn();
 void jswrap_banglejs_setLocked(bool isLocked);
 int jswrap_banglejs_isLocked();
 

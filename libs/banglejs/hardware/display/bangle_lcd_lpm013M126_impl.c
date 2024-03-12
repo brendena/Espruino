@@ -14,5 +14,18 @@ void banglejs_display_init_impl(JsGraphics *gfx){
   banglejs_pwrBacklight_impl(true);
 }
 
+void banglejs_display_idle_impl(){
+  lcdMemLCD_setOverlay(NULL, 0, 0);
+}
+
+void graphicsInternalFlip()
+{
+  lcdMemLCD_flip(&graphicsInternal);
+}
+
+void banglejs_setLCDPowerController_impl(bool isOn) {
+  jshPinOutput(LCD_EXTCOMIN, 0);
+  jshPinOutput(LCD_DISP, isOn); // enable
+}
 
 #endif
