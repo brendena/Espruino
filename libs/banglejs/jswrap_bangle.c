@@ -3080,8 +3080,6 @@ NO_INLINE void jswrap_banglejs_init() {
   JsVar *fn = jsvNewNativeFunction((void (*)(void))lcd_flip, JSWAT_VOID|JSWAT_THIS_ARG|(JSWAT_BOOL << (JSWAT_BITS*1)));
   jsvObjectSetChildAndUnLock(graphics,"flip",fn);
 
-  lcdST7789_setMode( LCDST7789_MODE_UNBUFFERED );
-
   if (!firstRun) {
     // Not first run - reset the LCD mode if it was set
 #ifdef LCD_CONTROLLER_ST7789_8BIT
