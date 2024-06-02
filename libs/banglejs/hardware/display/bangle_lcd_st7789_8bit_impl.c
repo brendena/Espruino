@@ -1,9 +1,11 @@
 #include "bangle_display_impl.h"
 
 #ifdef LCD_CONTROLLER_ST7789_8BIT
+#include "lcd_st7789_8bit.h"
+#include "jswrap_graphics.h"
 
 void banglejs_lcdWr_impl(int cmd, int dLen, const uint8_t *dPtr){
-    lcdST7789_cmd(cmd, dLen, (const uint8_t *)dPtr);
+    lcdST7789_cmd(cmd, dLen, dPtr);
 }
 
 void banglejs_setLCDMode_impl(JsVar *mode)
@@ -126,6 +128,7 @@ void banglejs_setLCDPowerController_impl(bool isOn) {
     lcdST7789_cmd(0x10, 0, NULL); // SLPIN
   }
 }
-//don't do anything in idle
+//don't do anything in idle/kill
 void banglejs_display_idle_impl(){};
+void banglejs_display_kill_impl(){};
 #endif

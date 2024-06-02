@@ -15,7 +15,6 @@
 #include "bangle_defines.h"
 #include "jspin.h"
 
-
 void jswrap_banglejs_setLCDTimeout(JsVarFloat timeout);
 void jswrap_banglejs_setLocked(bool isLocked);
 int jswrap_banglejs_isLocked();

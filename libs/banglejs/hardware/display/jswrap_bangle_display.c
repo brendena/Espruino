@@ -170,13 +170,16 @@ void jswrap_banglejs_setLCDOffset(int y) {
     "generate" : "jswrap_banglejs_setLCDOverlay",
     "params" : [
       ["img","JsVar","An image, or undefined to clear"],
-      ["x","int","The X offset the graphics instance should be overlaid on the screen with"],
-      ["y","int","The Y offset the graphics instance should be overlaid on the screen with"]
+      ["x","JsVar","The X offset the graphics instance should be overlaid on the screen with"],
+      ["y","int","The Y offset the graphics instance should be overlaid on the screen with"],
+      ["options","JsVar","[Optional] object `{remove:fn, id:\"str\"}`"]
     ],
     "#if" : "defined(BANGLEJS_Q3) || defined(DICKENS)",
     "typescript" : [
       "setLCDOverlay(img: any, x: number, y: number): void;",
-      "setLCDOverlay(): void;"
+      "setLCDOverlay(): void;",
+      "setLCDOverlay(img: any, x: number, y: number, options: { id : string, remove: () => void }): void;",
+      "setLCDOverlay(img: any, options: { id : string }}): void;"
     ]
 }
 Overlay an image or graphics instance on top of the contents of the graphics buffer.
@@ -190,37 +193,70 @@ var img = require("heatshrink").decompress(atob(`lss4UBvvv///ovBlMyqoADv/VAwlV//
 GwIKCngWC14sB7QKCh4CBCwN/64KDgfACwWn6vWGwYsBCwOputWJgYsCgGqytVBQYsCLYOlqtqwAsFEINVrR4BFgghBBQosDEINWIQ
 YsDEIQ3DFgYhCG4msSYeVFgnrFhMvOAgsEkE/FhEggYWCFgIhDkEACwQKBEIYKBCwSGFBQJxCQwYhBBQTKDqohCBQhCCEIJlDXwrKE
 BQoWHBQdaCwuqJoI4CCwgKECwJ9CJgIKDq+qBYUq1WtBQf+BYIAC3/VBQX/tQKDz/9BQY5BAAVV/4WCBQJcBKwVf+oHBv4wCAAYhB`));
-Bangle.setLCDOverlay(img,66,66);
+Bangle.setLCDOverlay(img,66,66, {id: "myOverlay", remove: () => print("Removed")});
 ```
 
 Or use a `Graphics` instance:
 
 ```
-var ovr = Graphics.createArrayBuffer(100,100,1,{msb:true}); // 1bpp
-ovr.drawLine(0,0,100,100);
-ovr.drawRect(0,0,99,99);
-Bangle.setLCDOverlay(ovr,38,38);
-```
-
-Although `Graphics` can be specified directly, it can often make more sense to
-create an Image from the `Graphics` instance, as this gives you access
-to color palettes and transparent colors. For instance this will draw a colored
-overlay with rounded corners:
-
-```
 var ovr = Graphics.createArrayBuffer(100,100,2,{msb:true});
+ovr.transparent = 0; // (optional) set a transparent color
+ovr.palette = new Uint16Array([0,0,g.toColor("#F00"),g.toColor("#FFF")]); // (optional) set a color palette
 ovr.setColor(1).fillRect({x:0,y:0,w:99,h:99,r:8});
 ovr.setColor(3).fillRect({x:2,y:2,w:95,h:95,r:7});
 ovr.setColor(2).setFont("Vector:30").setFontAlign(0,0).drawString("Hi",50,50);
-Bangle.setLCDOverlay({
-  width:ovr.getWidth(), height:ovr.getHeight(),
-  bpp:2, transparent:0,
-  palette:new Uint16Array([0,0,g.toColor("#F00"),g.toColor("#FFF")]),
-  buffer:ovr.buffer
-},38,38);
+Bangle.setLCDOverlay(ovr,38,38, {id: "myOverlay", remove: () => print("Removed")});
 ```
+
+To remove an overlay, simply call:
+
+```
+Bangle.setLCDOverlay(undefined, {id: "myOverlay"});
+```
+
+Before 2v22 the `options` object isn't parsed, and as a result
+the remove callback won't be called, and `Bangle.setLCDOverlay(undefined)` will
+remove *any* active overlay.
+
+The `remove` callback is called when the current overlay is removed or replaced with
+another, but *not* if setLCDOverlay is called again with an image and the same ID.
 */
-void jswrap_banglejs_setLCDOverlay(JsVar *imgVar, int x, int y) {
+void jswrap_banglejs_setLCDOverlay(JsVar *imgVar, int xv, int y, JsVar *options) {
+  bool removingOverlay = jsvIsUndefined(imgVar);
+  int x = jsvGetInteger(xv);
+  if (removingOverlay) // handle Bangle.setLCDOverlay(undefined, {id: "myOverlay"});
+    options = xv;
+  JsVar *id = 0;
+  if (jsvIsObject(options)) {
+    id = jsvObjectGetChildIfExists(options, "id");
+  }
+  JsVar *ovrId = jsvObjectGetChildIfExists(execInfo.hiddenRoot, "lcdOvrId");
+  bool idIsDifferent = !jsvIsEqual(id, ovrId);
+  jsvUnLock(ovrId);
+  // if we are removing overlay, and supplied an ID, and it's different to the current one, don't do anything
+  if (removingOverlay && id && idIsDifferent) {
+    jsvUnLock(id);
+    return;
+  }
+  // We're definitely changing overlay now... run the remove callback if it exists and the ID is different
+  if (idIsDifferent) {
+    JsVar *removeCb = jsvObjectGetChildIfExists(execInfo.hiddenRoot, "lcdOvrCb");
+    if (removeCb) {
+      jsiQueueEvents(0, removeCb, NULL, 0);
+      jsvUnLock(removeCb);
+    }
+  }
+  // update the fields in the Bangle object
+  if (imgVar) {
+    jsvObjectSetOrRemoveChild(execInfo.hiddenRoot, "lcdOvrId", id);
+    JsVar *removeCb = jsvIsObject(options) ? jsvObjectGetChildIfExists(options, "remove") : NULL;
+    jsvObjectSetOrRemoveChild(execInfo.hiddenRoot, "lcdOvrCb", removeCb);
+    jsvUnLock(removeCb);
+  } else { // we're removing the overlay, remove all callbacks
+    jsvObjectRemoveChild(execInfo.hiddenRoot, "lcdOvrId");
+    jsvObjectRemoveChild(execInfo.hiddenRoot, "lcdOvrCb");
+  }
+  jsvUnLock(id);
   banglejs_setLCDOverlay_impl(imgVar, x, y);
   // set all as modified
   // TODO: Could look at old vs new overlay state and update only lines that had changed?

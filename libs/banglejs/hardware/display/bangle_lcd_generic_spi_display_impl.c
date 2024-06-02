@@ -5,7 +5,7 @@
 
 
 void banglejs_lcdWr_impl(int cmd, int dLen, const uint8_t *dPtr){
-  lcdCmd_SPILCD(cmd, dLen, (const uint8_t *)dPtr);
+  lcdCmd_SPILCD(cmd, dLen, dPtr);
 }
 
 void banglejs_display_init_impl(JsGraphics *gfx){
@@ -13,7 +13,7 @@ void banglejs_display_init_impl(JsGraphics *gfx){
   lcdInit_SPILCD(&graphicsInternal);
 }
 
-void banglejs_display_idle_impl(){
+void banglejs_display_kill_impl(){
   lcdSetOverlay_SPILCD(NULL, 0, 0);
 }
 void graphicsInternalFlip()

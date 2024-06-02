@@ -133,11 +133,3 @@ typedef enum {
 
 
 #define ESPR_WEAK __attribute__((weak))
-
-#ifdef EMULATED
-    #define ESPR_EMULATE(func) func {} 
-#else
-    #define ESPR_EMULATE(func)  func; 
-#endif
-
-

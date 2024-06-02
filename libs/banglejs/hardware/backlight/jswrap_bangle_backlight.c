@@ -69,7 +69,14 @@ void jswrap_banglejs_setLCDPowerBacklight(bool isOn) {
     if (lockTimeout > 0 && lockTimeout <= backlightTimeout) _jswrap_banglejs_setLocked(true, "backlight");
     bangleFlags &= ~JSBF_LCD_BL_ON;
   }
-  banglejs_setLCDPowerBacklight_impl(isOn);
+  banglejs_setLCDPowerBacklight_impl(isOn && (lcdBrightness>0 ));
+
+#ifdef LCD_BL
+  if (isOn && lcdBrightness > 0 && lcdBrightness < 255) {
+          jshPinAnalogOutput(LCD_BL, lcdBrightness/256.0, 200, JSAOF_NONE);
+
+  }
+#endif
 }
 
 

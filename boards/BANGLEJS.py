@@ -58,6 +58,11 @@ info = {
      'DFU_SETTINGS=--application-version 0xff --hw-version 52 --sd-req 0x8C,0x91',
      'INCLUDE += -I$(ROOT)/libs/banglejs -I$(ROOT)/libs/misc',
      'WRAPPERSOURCES += libs/banglejs/jswrap_bangle.c',
+      #added bangle sources
+     'WRAPPERSOURCES += libs/banglejs/hardware/display/jswrap_bangle_display.c',
+     'WRAPPERSOURCES += libs/banglejs/hardware/backlight/jswrap_bangle_backlight.c',
+     'SOURCES += libs/banglejs/hardware/hardware_impl.c',
+
      'SOURCES += libs/misc/nmea.c',
      'SOURCES += libs/misc/stepcount.c',
      'SOURCES += libs/misc/heartrate.c',

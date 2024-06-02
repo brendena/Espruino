@@ -610,17 +610,13 @@ bool pressureSPL06Enabled = false;
 JshI2CInfo i2cInternal;
 #define ACCEL_I2C &i2cInternal
 #define MAG_I2C &i2cInternal
-// Nordic app timer to handle backlight PWM
-APP_TIMER_DEF(m_backlight_on_timer_id);
-APP_TIMER_DEF(m_backlight_off_timer_id);
-#define BACKLIGHT_PWM_INTERVAL 15 // in msec - 67Hz PWM
+
 #define HEARTRATE 1
 #define GPS_UART EV_SERIAL1
 #define GPS_UBLOX 1 // handle decoding of 'UBX' packets from the GPS
 #endif // !EMULATED
 
 #define IOEXP_GPS 0x01
-#define IOEXP_LCD_BACKLIGHT 0x20
 #define IOEXP_LCD_RESET 0x40
 #define IOEXP_HRM 0x80
 #define HOME_BTN 3
@@ -2919,12 +2915,13 @@ NO_INLINE void jswrap_banglejs_hwinit() {
   // we need ESPR_GRAPHICS_INTERNAL=1
 
   graphicsStructInit(&graphicsInternal, LCD_WIDTH, LCD_HEIGHT, LCD_BPP);
-  banglejs_display_init_impl(&graphicsInternal);
   graphicsInternal.data.flags = 0;
 #ifdef DTNO1_F5
   graphicsInternal.data.flags = JSGRAPHICSFLAGS_INVERT_X | JSGRAPHICSFLAGS_INVERT_Y;
 #endif
   graphicsInternal.data.fontSize = JSGRAPHICS_FONTSIZE_6X8+1; // 4x6 size is default
+  banglejs_display_init_impl(&graphicsInternal);
+
   graphicsSetCallbacks(&graphicsInternal);
   // set default graphics themes - before we even start to load settings.json
   jswrap_banglejs_setTheme();
@@ -2953,7 +2950,6 @@ NO_INLINE void jswrap_banglejs_init() {
 #endif
 
   bool recoveryMode = false;
-
   //jsiConsolePrintf("bangleFlags %d\n",bangleFlags);
   if (firstRun) {
     bangleFlags = JSBF_DEFAULT | JSBF_LCD_ON | JSBF_LCD_BL_ON; // includes bangleFlags
@@ -3083,6 +3079,8 @@ NO_INLINE void jswrap_banglejs_init() {
   // Create 'flip' fn
   JsVar *fn = jsvNewNativeFunction((void (*)(void))lcd_flip, JSWAT_VOID|JSWAT_THIS_ARG|(JSWAT_BOOL << (JSWAT_BITS*1)));
   jsvObjectSetChildAndUnLock(graphics,"flip",fn);
+
+  lcdST7789_setMode( LCDST7789_MODE_UNBUFFERED );
 
   if (!firstRun) {
     // Not first run - reset the LCD mode if it was set
@@ -3439,7 +3437,7 @@ void jswrap_banglejs_kill() {
   jshPinWatch(BTN5_PININDEX, false, JSPW_NONE);
   jshSetPinShouldStayWatched(BTN5_PININDEX,false);
 #endif
-  banglejs_display_idle_impl();
+  banglejs_display_kill_impl();
   // Graphics var is getting removed, so set this to null.
   jsvUnLock(graphicsInternal.graphicsVar);
   graphicsInternal.graphicsVar = NULL;
@@ -5487,3 +5485,5 @@ void jsbangle_push_event(JsBangleEvent type, uint16_t value) {
   evt.data.chars[2] = (char)(value & 0xFF);
   jshPushEvent(&evt);
 }
+
+

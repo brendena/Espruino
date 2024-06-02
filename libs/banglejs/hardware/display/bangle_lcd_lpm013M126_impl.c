@@ -14,7 +14,7 @@ void banglejs_display_init_impl(JsGraphics *gfx){
   banglejs_pwrBacklight_impl(true);
 }
 
-void banglejs_display_idle_impl(){
+void banglejs_display_kill_impl(){
   lcdMemLCD_setOverlay(NULL, 0, 0);
 }
 

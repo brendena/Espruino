@@ -1,4 +1,5 @@
 #include "bangle_display_impl.h"
+
 ESPR_WEAK void banglejs_lcdWr_impl(int cmd, int dLen, const uint8_t *dPtr){}
 ESPR_WEAK void banglejs_setLCDMode_impl(JsVar *mode)
 {

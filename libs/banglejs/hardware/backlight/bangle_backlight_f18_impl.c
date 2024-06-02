@@ -1,9 +1,15 @@
 #include "bangle_backlight_impl.h"
 
 #ifdef BANGLEJS_F18
+#include "bluetooth.h"
+#include "lcd_spilcd.h"
+#define BACKLIGHT_PWM_INTERVAL 15 // in msec - 67Hz PWM
+#define IOEXP_LCD_BACKLIGHT 0x20
 
 APP_TIMER_DEF(m_backlight_on_timer_id);
 APP_TIMER_DEF(m_backlight_off_timer_id);
+void backlightOnHandler();
+void backlightOffHandler();
 
 void banglejs_setLCDPowerBacklight_impl(bool isOn) {
   app_timer_stop(m_backlight_on_timer_id);
