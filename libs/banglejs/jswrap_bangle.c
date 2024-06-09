@@ -4375,6 +4375,7 @@ JsVar *jswrap_banglejs_getPressure() {
   }
   return jsvLockAgain(promisePressure);
 #endif
+  return NULL;
 }
 
 /*JSON{

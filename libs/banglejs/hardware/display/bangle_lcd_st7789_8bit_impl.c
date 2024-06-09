@@ -63,7 +63,7 @@ void banglejs_setLCDMode_impl(JsVar *mode)
       jsvObjectSetChildAndUnLock(graphics, "buffer", jsvNewArrayBufferFromString(arrData, (unsigned int)bufferSize));
     } else {
       jsExceptionHere(JSET_ERROR, "Not enough memory to allocate offscreen buffer");
-      jswrap_banglejs_setLCDMode(0); // go back to default mode
+      banglejs_setLCDMode_impl(0); // go back to default mode
       return;
     }
     jsvUnLock(arrData);
@@ -103,10 +103,7 @@ void banglejs_setLCDOffset_impl(int y)
   lcdST7789_setYOffset(y);
 }
 
-void banglejs_setLCDOverlay_impl(JsVar *imgVar, int x, int y)
-{
-  lcdSetOverlay_SPILCD(imgVar, x, y);
-}
+void banglejs_setLCDOverlay_impl(JsVar *imgVar, int x, int y){}
 
 void banglejs_display_init_impl(JsGraphics *gfx){
   gfx->data.type = JSGRAPHICSTYPE_ST7789_8BIT;

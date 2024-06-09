@@ -221,7 +221,7 @@ remove *any* active overlay.
 The `remove` callback is called when the current overlay is removed or replaced with
 another, but *not* if setLCDOverlay is called again with an image and the same ID.
 */
-void jswrap_banglejs_setLCDOverlay(JsVar *imgVar, int xv, int y, JsVar *options) {
+void jswrap_banglejs_setLCDOverlay(JsVar *imgVar, JsVar *xv, int y, JsVar *options) {
   bool removingOverlay = jsvIsUndefined(imgVar);
   int x = jsvGetInteger(xv);
   if (removingOverlay) // handle Bangle.setLCDOverlay(undefined, {id: "myOverlay"});

@@ -10,7 +10,7 @@ void jswrap_banglejs_setLCDPower(bool isOn);
 void jswrap_banglejs_setLCDMode(JsVar *mode);
 JsVar *jswrap_banglejs_getLCDMode();
 void jswrap_banglejs_setLCDOffset(int y);
-void jswrap_banglejs_setLCDOverlay(JsVar *imgVar, int xv, int y, JsVar *options);
+void jswrap_banglejs_setLCDOverlay(JsVar *imgVar, JsVar * xv, int y, JsVar *options);
 int jswrap_banglejs_isLCDOn();
 
 
