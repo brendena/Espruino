@@ -406,6 +406,18 @@ endif #USE_FILESYSTEM_SDIO
 endif #!LINUX
 endif #USE_FILESYSTEM
 
+ifeq ($(USE_BANGLEJS),1)
+
+#@echo BANGLEJS is defined
+WRAPPERSOURCES += libs/banglejs/jswrap_bangle.c
+WRAPPERSOURCES += libs/banglejs/hardware/display/jswrap_bangle_display.c
+WRAPPERSOURCES += libs/banglejs/hardware/backlight/jswrap_bangle_backlight.c
+SOURCES        += libs/banglejs/hardware/hardware_impl.c
+SOURCES        += libs/banglejs/hardware/backlight/jswrap_bangle_backlight.c
+SOURCES        += libs/banglejs/hardware/display/jswrap_bangle_display.c
+#DEFINES += -DBANGLEJS for some reason BANGLE_1 doesn't use this
+endif
+
 ifeq ($(USE_GRAPHICS),1)
 DEFINES += -DUSE_GRAPHICS
 INCLUDE += -I$(ROOT)/libs/graphics

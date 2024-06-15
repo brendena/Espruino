@@ -38,7 +38,8 @@ info = {
      'CRYPTO','SHA256','SHA512',
      'LCD_MEMLCD',
      'TENSORFLOW',
-     'JIT' # JIT compiler enabled
+     'JIT', # JIT compiler enabled
+     'BANGLEJS'
    ],
    'makefile' : [
      'DEFINES += -DESPR_HWVERSION=2 -DBANGLEJS -DBANGLEJS_Q3',
@@ -65,13 +66,8 @@ info = {
      'DEFINES+=-DNO_DUMP_HARDWARE_INITIALISATION', # don't dump hardware init - not used and saves 1k of flash
      'DEFINES += -DESPR_NO_LINE_NUMBERS=1', # we execute mainly from flash, so line numbers can be worked out
      'INCLUDE += -I$(ROOT)/libs/banglejs -I$(ROOT)/libs/misc',
-     'WRAPPERSOURCES += libs/banglejs/jswrap_bangle.c',
      'WRAPPERSOURCES += libs/graphics/jswrap_font_6x15.c',
      'WRAPPERSOURCES += libs/graphics/jswrap_font_12x20.c',
-      #added bangle sources
-     'WRAPPERSOURCES += libs/banglejs/hardware/display/jswrap_bangle_display.c',
-     'WRAPPERSOURCES += libs/banglejs/hardware/backlight/jswrap_bangle_backlight.c',
-     'SOURCES += libs/banglejs/hardware/hardware_impl.c',
 
      
      'SOURCES += libs/misc/nmea.c',

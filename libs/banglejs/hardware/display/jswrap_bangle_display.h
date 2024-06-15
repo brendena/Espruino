@@ -4,6 +4,7 @@
 #include "stdio.h"
 #include "graphics.h"
 #include "../backlight/bangle_backlight_impl.h"
+#include "bangle_display_impl.h"
 /*JS functions*/
 void jswrap_banglejs_lcdWr(JsVarInt cmd, JsVar *data);
 void jswrap_banglejs_setLCDPower(bool isOn);

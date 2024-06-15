@@ -77,10 +77,6 @@
 #include "hrm_vc31.h" // for Bangle.setOptions
 #endif
 
-#include "hardware/backlight/jswrap_bangle_backlight.h"
-#include "hardware/backlight/jswrap_bangle_backlight.c"
-#include "hardware/display/jswrap_bangle_display.h"
-#include "hardware/display/jswrap_bangle_display.c"
 
 /*TYPESCRIPT
 declare const BTN1: Pin;

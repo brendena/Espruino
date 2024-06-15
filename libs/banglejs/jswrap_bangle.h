@@ -14,6 +14,8 @@
 #pragma once
 #include "bangle_defines.h"
 #include "jspin.h"
+#include "hardware/backlight/jswrap_bangle_backlight.h"
+#include "hardware/display/jswrap_bangle_display.h"
 
 void jswrap_banglejs_setLCDTimeout(JsVarFloat timeout);
 void jswrap_banglejs_setLocked(bool isLocked);
