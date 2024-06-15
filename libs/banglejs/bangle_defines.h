@@ -44,7 +44,14 @@ typedef enum {
   JSBF_LCD_BL_ON     = 1<<17,
   JSBF_LOCKED        = 1<<18,
   JSBF_HRM_INSTANT_LISTENER = 1<<19,
-
+  JSBF_LCD_DBL_REFRESH = 1<<20, ///< On Bangle.js 2, toggle extcomin twice for each poll interval (avoids screen 'flashing' behaviour off axis)
+#ifdef BANGLEJS_Q3
+  /** On some Bangle.js 2, BTN1 (which is used for reloading apps) gets a low resistance across it
+  (possibly due to water damage) and the internal resistor can no longer overcome that resistance
+  so the button appears stuck on. With this fix we force the button pin low just before reading to try
+  and overcome that resistance, and we also disable the button watch interrupt. */
+  JSBF_BTN_LOW_RESISTANCE_FIX = 1<<21,
+#endif
   JSBF_DEFAULT = ///< default at power-on
       JSBF_WAKEON_TWIST|
       JSBF_WAKEON_BTN1|JSBF_WAKEON_BTN2|JSBF_WAKEON_BTN3

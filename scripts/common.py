@@ -61,7 +61,7 @@ if "check_output" not in dir( subprocess ):
 #
 # Comments look like:
 #
-#/*JSON{ "type":"staticmethod|staticproperty|constructor|method|property|function|variable|class|library|idle|init|kill|EV_xxx",
+#/*JSON{ "type":"staticmethod|staticproperty|constructor|method|property|function|variable|class|library|idle|init|kill|EV_xxx|powerusage",
 #                      // class = built-in class that does not require instantiation
 #                      // library = built-in class that needs require('classname')
 #                      // idle = function to run on idle regardless
@@ -69,6 +69,7 @@ if "check_output" not in dir( subprocess ):
 #                      // init = function to run on Initialisation (eg boot/load/reset/after save/etc)
 #                      // kill = function to run on Deinitialisation (eg before save/reset/etc)
 #                      // EV_xxx = Something to be called with a character in an IRQ when it is received (eg. EV_SERIAL1)
+#                      // powerusage = fn(JsVar*) called with an object, and should insert fields for deviec names and estimated power usage in uA
 #         "class" : "Double", "name" : "doubleToIntBits",
 #         "needs_parentName":true,           // optional - if for a method, this makes the first 2 args parent+parentName (not just parent)
 #         "generate_full|generate|wrap" : "*(JsVarInt*)&x", // if generate=false, it'll only be used for docs
@@ -436,9 +437,10 @@ def get_ifdef_description(d):
   if d=="SAVE_ON_FLASH_EXTREME": return "devices with extremely low flash memory (eg. HYSTM32_28)"
   if d=="STM32": return "STM32 devices (including Espruino Original, Pico and WiFi)"
   if d=="STM32F1": return "STM32F1 devices (including Original Espruino Board)"
-  if d=="NRF52_SERIES": return "NRF52 devices (like Puck.js, Pixl.js, Bangle.js and MDBT42Q)"
+  if d=="NRF52_SERIES": return "NRF52 devices (like Puck.js, Pixl.js, Jolt.js, Bangle.js and MDBT42Q)"
   if d=="PUCKJS": return "Puck.js devices"
   if d=="PIXLJS": return "Pixl.js boards"
+  if d=="JOLTJS": return "Jolt.js devices"
   if d=="ESPRUINOWIFI": return "Espruino WiFi boards"
   if d=="ESPRUINOBOARD": return "'Original' Espruino boards"
   if d=="PICO": return "Espruino Pico boards"
@@ -446,6 +448,7 @@ def get_ifdef_description(d):
   if d=="BANGLEJS_F18": return "Bangle.js 1 smartwatches"
   if d=="BANGLEJS_Q3" or d=="BANGLEJS2": return "Bangle.js 2 smartwatches"
   if d=="ESPR_EMBED": return "Embeddable Espruino C builds"
+  if d=="ESPR_USE_STEPPER_TIMER": return "Built-in Stepper Motor class (2v21+)"
   if d=="ESP8266": return "ESP8266 boards running Espruino"
   if d=="ESP32": return "ESP32 boards"
   if d=="EFM32": return "EFM32 devices"

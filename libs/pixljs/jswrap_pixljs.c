@@ -33,6 +33,7 @@
 #include "lcd_arraybuffer.h"
 
 const Pin PIXL_IO_PINS[] = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15,16,17,18,19};
+bool lcdIsOn;
 
 /*JSON{
     "type": "class",
@@ -349,6 +350,7 @@ static bool pixl_selfTest() {
 }*/
 void jswrap_pixljs_init() {
   // LCD Init 1
+  lcdIsOn = true;
   jshPinOutput(LCD_SPI_CS,0);
   jshPinOutput(LCD_SPI_DC,0);
   jshPinOutput(LCD_SPI_SCK,0);
@@ -607,6 +609,7 @@ var mainmenu = {
   "A Number" : {
     value : number,
     min:0,max:100,step:10,
+    // noList : true, // On Bangle.js devices this forces use of the number-chooser (and not a scrolling list)
     onchange : v => { number=v; }
   },
   "Exit" : function() { E.showMenu(); }, // remove the menu
@@ -729,3 +732,11 @@ E.showAlert("These are\nLots of\nLines","My Title").then(function() {
 
 To remove the window, call `E.showAlert()` with no arguments.
 */
+
+/*JSON{
+  "type" : "powerusage",
+  "generate" : "jswrap_pixljs_powerusage"
+}*/
+void jswrap_pixljs_powerusage(JsVar *devices) {
+  jsvObjectSetChildAndUnLock(devices, "LCD", jsvNewFromInteger(lcdIsOn ? 170 : 20));
+}

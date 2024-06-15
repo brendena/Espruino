@@ -1159,7 +1159,7 @@ On the desktop [JSON5 parsers](https://github.com/json5/json5) will parse the
 strings produced by `E.toJS` without trouble.
  */
 JsVar *jswrap_espruino_toJS(JsVar *v) {
-  JSONFlags flags = JSON_DROP_QUOTES|JSON_NO_UNDEFINED|JSON_ARRAYBUFFER_AS_ARRAY;
+  JSONFlags flags = JSON_DROP_QUOTES|JSON_NO_UNDEFINED|JSON_ARRAYBUFFER_AS_ARRAY|JSON_ALLOW_TOJSON;
   JsVar *result = jsvNewFromEmptyString();
   if (result) {// could be out of memory
     jsfGetJSON(v, result, flags);
@@ -1508,7 +1508,7 @@ void jswrap_e_dumpVariables() {
     else if (jsvIsString(v)) {
       JsVar *s;
       if (jsvGetStringLength(v)>20) {
-        s = jsvNewFromStringVar(v, 0, 17);
+        s = jsvNewWritableStringFromStringVar(v, 0, 17);
         jsvAppendString(s,"...");
       } else
         s = jsvLockAgain(v);
@@ -2425,6 +2425,78 @@ int jswrap_espruino_getRTCPrescaler(bool calibrate) {
   return 0;
 #endif
 }
+
+/*JSON{
+  "type" : "staticmethod",
+  "class" : "E",
+  "name" : "getPowerUsage",
+  "generate" : "jswrap_espruino_getPowerUsage",
+  "return" : ["JsVar","An object detailing power usage in microamps"]
+}
+This function returns an object detailing the current **estimated** power usage
+of the Espruino device in microamps (uA). It is not intended to be a replacement
+for measuring actual power consumption, but can be useful for finding obvious power
+draws.
+
+Where an Espruino device has outputs that are connected to other things, those
+are not included in the power usage figures.
+
+Results look like:
+
+```
+{
+  device: {
+    CPU : 2000, // microcontroller
+    LCD : 100, // LCD
+    // ...
+  },
+  total : 5500 // estimated usage in microamps
+}
+```
+
+**Note:** Currently only nRF52-based devices have variable CPU power usage
+figures. These are based on the time passed for each SysTick event, so under heavy
+usage the figure will update within 0.3s, but under low CPU usage it could take
+minutes for the CPU usage figure to update.
+
+**Note:** On Jolt.js we take account of internal resistance on H0/H2/H4/H6 where
+we can measure voltage. H1/H3/H5/H7 cannot be measured.
+*/
+JsVar *jswrap_espruino_getPowerUsage() {
+  JsVar *devices = jsvNewObject();
+  if (!devices) return 0;
+  // add stuff we know about
+  jsvGetProcessorPowerUsage(devices); // CPU/etc
+#ifdef LED1_PININDEX
+  if (jshPinGetState(LED1_PININDEX) & JSHPINSTATE_PIN_IS_ON)
+    jsvObjectSetChildAndUnLock(devices, "LED1", jsvNewFromInteger(8000));
+#endif
+#ifdef LED2_PININDEX
+  if (jshPinGetState(LED2_PININDEX) & JSHPINSTATE_PIN_IS_ON)
+    jsvObjectSetChildAndUnLock(devices, "LED2", jsvNewFromInteger(8000));
+#endif
+#ifdef LED3_PININDEX
+  if (jshPinGetState(LED3_PININDEX) & JSHPINSTATE_PIN_IS_ON)
+    jsvObjectSetChildAndUnLock(devices, "LED3", jsvNewFromInteger(8000));
+#endif
+  // Get data from jswrap_ files
+  jswGetPowerUsage(devices);
+  // sum up responses
+  JsVarFloat total = 0;
+  JsvObjectIterator it;
+  jsvObjectIteratorNew(&it, devices);
+  while (jsvObjectIteratorHasValue(&it)) {
+    total += jsvGetFloatAndUnLock(jsvObjectIteratorGetValue(&it));
+    jsvObjectIteratorNext(&it);
+  }
+  jsvObjectIteratorFree(&it);
+  // return object
+  JsVar *usage = jsvNewObject();
+  jsvObjectSetChildAndUnLock(usage, "device", devices);
+  jsvObjectSetChildAndUnLock(usage, "total", jsvNewFromFloat(total));
+  return usage;
+}
+
 
 /*JSON{
   "type" : "staticmethod",

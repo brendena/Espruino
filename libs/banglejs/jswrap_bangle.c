@@ -597,6 +597,8 @@ bool pressureSPL06Enabled = false;
 #define PRESSURE_DEVICE_SPL06_007 1 // BMP280 already defined
 #define PRESSURE_DEVICE_BMP280_EN pressureBMP280Enabled
 #define PRESSURE_DEVICE_SPL06_007_EN pressureSPL06Enabled // hardware v2.1 is SPL06_001 - we need this as well
+
+IOEventFlags btn1EventFlags; // for JSBF_BTN_LOW_RESISTANCE_FIX
 #endif // EMULATED
 
 #define HOME_BTN 1
@@ -891,6 +893,7 @@ volatile JsBangleFlags bangleFlags = JSBF_NONE;
 JsBangleTasks bangleTasks;
 
 const char *lockReason = 0; ///< If JSBT_LOCK/UNLOCK is set, this is the reason (if known) - should point to a constant string (not on stack!)
+void btnHandlerCommon(int button, bool state, IOEventFlags flags);
 
 void jswrap_banglejs_pwrGPS(bool on) {
   if (on) bangleFlags |= JSBF_GPS_ON;
@@ -1050,6 +1053,24 @@ void jswrap_banglejs_kickPollWatchdog() {
  * Also, holding down both buttons will reboot */
 void peripheralPollHandler() {
   JsSysTime time = jshGetSystemTime();
+
+#ifdef BANGLEJS_Q3
+  /* See comments on JSBF_BTN_LOW_RESISTANCE_FIX - on Bangles with damaged buttons
+  that always stay on this can help to make them usable again. */
+  if (bangleFlags & JSBF_BTN_LOW_RESISTANCE_FIX) {
+    jshPinSetValue(BTN1_PININDEX, !BTN1_ONSTATE);
+    jshPinSetState(BTN1_PININDEX, JSHPINSTATE_GPIO_OUT);
+    nrf_delay_us(10);
+    jshPinSetState(BTN1_PININDEX, BTN1_PINSTATE);
+    static bool lastBtn1Value = 0;
+    bool btn1Value = jshPinGetValue(BTN1_PININDEX);
+    if (btn1Value != lastBtn1Value) {
+      btnHandlerCommon(1, btn1Value, btn1EventFlags);
+      lastBtn1Value = btn1Value;
+    }
+  }
+#endif
+
   // Handle watchdog
   if (!(jshPinGetValue(BTN1_PININDEX)
 #ifdef BTN2_PININDEX
@@ -1098,7 +1119,7 @@ void peripheralPollHandler() {
   }
 
 #ifdef LCD_CONTROLLER_LPM013M126
-  // toggle EXTCOMIN to avoid burn-in on LCD
+  // pulse EXTCOMIN to avoid burn-in on LCD
   if (bangleFlags & JSBF_LCD_ON)
     lcdMemLCD_extcominToggle();
 #endif
@@ -1524,6 +1545,13 @@ void peripheralPollHandler() {
 
   // we're done, ensure we clear I2C flag
   i2cBusy = false;
+
+#ifdef LCD_CONTROLLER_LPM013M126
+  // pulse EXTCOMIN to avoid burn-in on LCD (second toggle, if JSBF_LCD_DBL_REFRESH is set)
+  if ((bangleFlags & JSBF_LCD_ON) && (bangleFlags & JSBF_LCD_DBL_REFRESH))
+    lcdMemLCD_extcominToggle();
+#endif
+
 }
 
 #ifdef HEARTRATE
@@ -1555,7 +1583,6 @@ static void hrmHandler(int ppgValue) {
 #endif // !EMULATED
 
 void btnHandlerCommon(int button, bool state, IOEventFlags flags) {
-
   // wake up IF LCD power or Lock has a timeout (so will turn off automatically)
   if (lcdPowerTimeout || backlightTimeout || lockTimeout) {
     if (((bangleFlags&JSBF_WAKEON_BTN1)&&(button==1)) ||
@@ -1653,7 +1680,10 @@ bool btnTouchHandler() {
 }
 #endif
 void btn1Handler(bool state, IOEventFlags flags) {
-  btnHandlerCommon(1,state,flags);
+#ifdef BANGLEJS_Q3
+  if (!(bangleFlags&JSBF_BTN_LOW_RESISTANCE_FIX))
+#endif
+    btnHandlerCommon(1,state,flags);
 }
 #ifdef BTN2_PININDEX
 void btn2Handler(bool state, IOEventFlags flags) {
@@ -1799,9 +1829,6 @@ void touchHandler(bool state, IOEventFlags flags) {
 
 
 
-
-
-
 /*JSON{
     "type" : "staticmethod",
     "class" : "Bangle",
@@ -1939,6 +1966,10 @@ This uses the accelerometer, not the touchscreen itself. default = `false`
    current value. If you desire a specific interval (e.g. the default 80ms) you
    must set it manually with `Bangle.setPollInterval(80)` after setting
    `powerSave:false`.
+* `lowResistanceFix` (Bangle.js 2, 2v22+) In the very rare case that your watch button
+gets damaged such that it has a low resistance and always stays on, putting the watch
+into a boot loop, setting this flag may improve matters (by forcing the input low
+before reading and disabling the hardware watch on BTN1).
 * `lockTimeout` how many milliseconds before the screen locks
 * `lcdPowerTimeout` how many milliseconds before the screen turns off
 * `backlightTimeout` how many milliseconds before the screen's backlight turns
@@ -1960,6 +1991,7 @@ for before the clock is reloaded? 1500ms default, or 0 means never.
 * `seaLevelPressure` (Bangle.js 2) Normally 1013.25 millibars - this is used for
   calculating altitude with the pressure sensor
 * `lcdBufferPtr` (Bangle.js 2 2v21+) Return a pointer to the first pixel of the 3 bit graphics buffer used by Bangle.js for the screen (stride = 178 bytes)
+* `lcdDoubleRefresh` (Bangle.js 2 2v22+) If enabled, pulses EXTCOMIN twice per poll interval (avoids off-axis flicker)
 
 Where accelerations are used they are in internal units, where `8192 = 1g`
 
@@ -1973,6 +2005,9 @@ JsVar * _jswrap_banglejs_setOptions(JsVar *options, bool createObject) {
   bool wakeOnDoubleTap = bangleFlags&JSBF_WAKEON_DBLTAP;
   bool wakeOnTwist = bangleFlags&JSBF_WAKEON_TWIST;
   bool powerSave = bangleFlags&JSBF_POWER_SAVE;
+#ifdef BANGLEJS_Q3
+  bool lowResistanceFix = bangleFlags&JSBF_BTN_LOW_RESISTANCE_FIX;
+#endif
   int stepCounterThresholdLow, stepCounterThresholdHigh; // ignore these with new step counter
   int _accelGestureStartThresh = accelGestureStartThresh*accelGestureStartThresh;
   int _accelGestureEndThresh = accelGestureEndThresh*accelGestureEndThresh;
@@ -1990,6 +2025,7 @@ JsVar * _jswrap_banglejs_setOptions(JsVar *options, bool createObject) {
 #endif
 #ifdef LCD_CONTROLLER_LPM013M126
   int lcdBufferPtr = (int)(size_t)lcdMemLCD_getRowPtr(0);
+  bool lcdDoubleRefresh = bangleFlags&JSBF_LCD_DBL_REFRESH;
 #endif
   jsvConfigObject configs[] = {
 #ifdef HEARTRATE
@@ -2023,6 +2059,9 @@ JsVar * _jswrap_banglejs_setOptions(JsVar *options, bool createObject) {
       {"wakeOnDoubleTap", JSV_BOOLEAN, &wakeOnDoubleTap},
       {"wakeOnTwist", JSV_BOOLEAN, &wakeOnTwist},
       {"powerSave", JSV_BOOLEAN, &powerSave},
+#ifdef BANGLEJS_Q3
+      {"lowResistanceFix", JSV_BOOLEAN, &lowResistanceFix},
+#endif
       {"lockTimeout", JSV_INTEGER, &lockTimeout},
       {"lcdPowerTimeout", JSV_INTEGER, &lcdPowerTimeout},
       {"backlightTimeout", JSV_INTEGER, &backlightTimeout},
@@ -2035,6 +2074,7 @@ JsVar * _jswrap_banglejs_setOptions(JsVar *options, bool createObject) {
 #endif
 #ifdef LCD_CONTROLLER_LPM013M126
       {"lcdBufferPtr", JSV_INTEGER, &lcdBufferPtr},
+      {"lcdDoubleRefresh", JSV_BOOLEAN, &lcdDoubleRefresh}
 #endif
   };
   if (createObject) {
@@ -2049,6 +2089,10 @@ JsVar * _jswrap_banglejs_setOptions(JsVar *options, bool createObject) {
     bangleFlags = (bangleFlags&~JSBF_WAKEON_DBLTAP) | (wakeOnDoubleTap?JSBF_WAKEON_DBLTAP:0);
     bangleFlags = (bangleFlags&~JSBF_WAKEON_TWIST) | (wakeOnTwist?JSBF_WAKEON_TWIST:0);
     bangleFlags = (bangleFlags&~JSBF_POWER_SAVE) | (powerSave?JSBF_POWER_SAVE:0);
+#ifdef BANGLEJS_Q3
+    bangleFlags = (bangleFlags&~JSBF_BTN_LOW_RESISTANCE_FIX) | (lowResistanceFix?JSBF_BTN_LOW_RESISTANCE_FIX:0);
+#endif
+
     if (lockTimeout<0) lockTimeout=0;
     if (lcdPowerTimeout<0) lcdPowerTimeout=0;
     if (backlightTimeout<0) backlightTimeout=0;
@@ -2065,6 +2109,9 @@ JsVar * _jswrap_banglejs_setOptions(JsVar *options, bool createObject) {
     touchMinY = touchY1;
     touchMaxX = touchX2;
     touchMaxY = touchY2;
+#endif
+#ifdef LCD_CONTROLLER_LPM013M126
+  bangleFlags = (bangleFlags&~JSBF_LCD_DBL_REFRESH) | (lcdDoubleRefresh?JSBF_LCD_DBL_REFRESH:0);
 #endif
   }
   return 0;
@@ -2115,7 +2162,7 @@ void _jswrap_banglejs_setLocked(bool isLocked, const char *reason) {
   }
 #endif
   if ((bangleFlags&JSBF_LOCKED) != isLocked) {
-    JsVar *bangle =jsvObjectGetChildIfExists(execInfo.root, "Bangle");
+    JsVar *bangle = jsvObjectGetChildIfExists(execInfo.root, "Bangle");
     if (bangle) {
       JsVar *v[2] = {
         jsvNewFromBool(isLocked),
@@ -2941,7 +2988,7 @@ NO_INLINE void jswrap_banglejs_init() {
   jshPinOutput(VIBRATE_PIN,0);
 #endif
 
-  #ifdef BANGLEJS_Q3
+#ifdef BANGLEJS_Q3
 #ifndef EMULATED
   jshSetPinShouldStayWatched(TOUCH_PIN_IRQ,true);
   channel = jshPinWatch(TOUCH_PIN_IRQ, true, JSPW_NONE);
@@ -3349,6 +3396,9 @@ NO_INLINE void jswrap_banglejs_init() {
   jshSetPinShouldStayWatched(BTN1_PININDEX,true);
   channel = jshPinWatch(BTN1_PININDEX, true, JSPW_NONE);
   if (channel!=EV_NONE) jshSetEventCallback(channel, btn1Handler);
+#ifndef EMULATED
+  btn1EventFlags = channel;
+#endif
 #else
   jshSetPinShouldStayWatched(BTN1_PININDEX,true);
   jshSetPinShouldStayWatched(BTN2_PININDEX,true);
@@ -5337,26 +5387,15 @@ While you could use setWatch/etc manually, the benefit here is that you don't
 end up with multiple `setWatch` instances, and the actual input method (touch,
 or buttons) is implemented dependent on the watch (Bangle.js 1 or 2)
 
-**Note:** You can override this function in boot code to change the interaction
-mode with the watch. For instance you could make all clocks start the launcher
-with a swipe by using:
-
 ```
-(function() {
-  var sui = Bangle.setUI;
-  Bangle.setUI = function(mode, cb) {
-    var m = ("object"==typeof mode) ? mode.mode : mode;
-    if (m!="clock") return sui(mode,cb);
-    sui(); // clear
-    Bangle.CLOCK=1;
-    Bangle.swipeHandler = Bangle.showLauncher;
-    Bangle.on("swipe", Bangle.swipeHandler);
-  };
-})();
+Bangle.setUI("updown", function (dir) {
+  // dir is +/- 1 for swipes up/down
+  // dir is 0 when button pressed
+});
 ```
 
 The first argument can also be an object, in which case more options can be
-specified:
+specified with `mode:"custom"`:
 
 ```
 Bangle.setUI({
@@ -5376,7 +5415,25 @@ If `remove` is specified, `Bangle.showLauncher`, `Bangle.showClock`, `Bangle.loa
 may choose to just call the `remove` function and then load a new app without resetting Bangle.js.
 As a result, **if you specify 'remove' you should make sure you test that after calling `Bangle.setUI()`
 without arguments your app is completely unloaded**, otherwise you may end up with memory leaks or
-other issues when switching apps. Please see http://www.espruino.com/Bangle.js+Fast+Load for more details on this.
+other issues when switching apps. Please see the [Bangle.js Fast Load Tutorial](https://www.espruino.com/Bangle.js+Fast+Load) for more details on this.
+
+**Note:** You can override this function in boot code to change the interaction
+mode with the watch. For instance you could make all clocks start the launcher
+with a swipe by using:
+
+```
+(function() {
+  var sui = Bangle.setUI;
+  Bangle.setUI = function(mode, cb) {
+    var m = ("object"==typeof mode) ? mode.mode : mode;
+    if (m!="clock") return sui(mode,cb);
+    sui(); // clear
+    Bangle.CLOCK=1;
+    Bangle.swipeHandler = Bangle.showLauncher;
+    Bangle.on("swipe", Bangle.swipeHandler);
+  };
+})();
+```
 */
 /*JSON{
     "type" : "staticmethod", "class" : "Bangle", "name" : "setUI", "patch":true,
@@ -5485,4 +5542,28 @@ void jsbangle_push_event(JsBangleEvent type, uint16_t value) {
   jshPushEvent(&evt);
 }
 
-
+/*JSON{
+  "type" : "powerusage",
+  "generate" : "jswrap_banglejs_powerusage"
+}*/
+void jswrap_banglejs_powerusage(JsVar *devices) {
+  // https://www.espruino.com/Bangle.js2#power-consumption
+#ifdef BANGLEJS_F18
+  if (jswrap_banglejs_isLCDOn())
+    jsvObjectSetChildAndUnLock(devices, "LCD", jsvNewFromInteger(40000));
+#endif
+#ifdef BANGLEJS_Q3
+  if (jswrap_banglejs_isBacklightOn())
+    jsvObjectSetChildAndUnLock(devices, "LCD_backlight", jsvNewFromInteger(14000));
+  if (!jswrap_banglejs_isLocked())
+    jsvObjectSetChildAndUnLock(devices, "LCD_touch", jsvNewFromInteger(1600));
+#endif
+  if (jswrap_banglejs_isHRMOn())
+    jsvObjectSetChildAndUnLock(devices, "HRM", jsvNewFromInteger(700));
+  if (jswrap_banglejs_isGPSOn())
+    jsvObjectSetChildAndUnLock(devices, "GPS", jsvNewFromInteger(20000));
+  if (jswrap_banglejs_isCompassOn())
+    jsvObjectSetChildAndUnLock(devices, "compass", jsvNewFromInteger(600));
+  if (jswrap_banglejs_isBarometerOn())
+    jsvObjectSetChildAndUnLock(devices, "baro", jsvNewFromInteger(200));
+}

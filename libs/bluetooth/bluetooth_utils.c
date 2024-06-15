@@ -210,6 +210,116 @@ const char *bleVarToUUIDAndUnLock(ble_uuid_t *uuid, JsVar *v) {
   return r;
 }
 
+#if PEER_MANAGER_ENABLED && ESPR_BLE_PRIVATE_ADDRESS_SUPPORT
+bool bleVarToPrivacy(JsVar *options, pm_privacy_params_t *privacy) {
+  memset(privacy, 0, sizeof(pm_privacy_params_t));
+  privacy->privacy_mode = BLE_GAP_PRIVACY_MODE_OFF;
+  privacy->private_addr_type = BLE_GAP_ADDR_TYPE_RANDOM_PRIVATE_RESOLVABLE;
+  privacy->private_addr_cycle_s = 0; // use default address change cycle
+  privacy->p_device_irk = NULL; // use device default irk
+  // options may be either undefined, a bool, or and object
+  if (jsvIsUndefined(options)) {
+    return true;
+  }
+  if (jsvIsBoolean(options) || jsvIsNumeric(options)) {
+    if (jsvGetBool(options)) {
+      // enabled with (ideally sensible) defaults
+      privacy->privacy_mode = BLE_GAP_PRIVACY_MODE_DEVICE_PRIVACY;
+    }
+    return true;
+  }
+  if (jsvIsObject(options)) {
+    bool invalidOption = false;
+    // privacy mode
+    {
+      JsVar *privacyModeVar = jsvObjectGetChildIfExists(options, "mode");
+      if (privacyModeVar && jsvIsString(privacyModeVar)) {
+        if (jsvIsStringEqual(privacyModeVar, "off")) {
+          privacy->privacy_mode = BLE_GAP_PRIVACY_MODE_OFF;
+        } else if (jsvIsStringEqual(privacyModeVar, "device_privacy")) {
+          privacy->privacy_mode = BLE_GAP_PRIVACY_MODE_DEVICE_PRIVACY;
+        } else if (jsvIsStringEqual(privacyModeVar, "network_privacy")) {
+          privacy->privacy_mode = BLE_GAP_PRIVACY_MODE_NETWORK_PRIVACY;
+        } else {
+          invalidOption = true;
+        }
+      } else {
+        invalidOption = true;
+      }
+      jsvUnLock(privacyModeVar);
+    }
+    // other options are only relevant if privacy_mode is something other than off
+    if (privacy->privacy_mode != BLE_GAP_PRIVACY_MODE_OFF) {
+      // private addr type
+      {
+        JsVar *privacyAddrTypeVar = jsvObjectGetChildIfExists(options, "addr_type");
+        if (privacyAddrTypeVar && jsvIsString(privacyAddrTypeVar)) {
+          if (jsvIsStringEqual(privacyAddrTypeVar, "random_private_resolvable")) {
+            privacy->private_addr_type = BLE_GAP_ADDR_TYPE_RANDOM_PRIVATE_RESOLVABLE;
+          } else if (jsvIsStringEqual(privacyAddrTypeVar, "random_private_non_resolvable")) {
+            privacy->private_addr_type = BLE_GAP_ADDR_TYPE_RANDOM_PRIVATE_NON_RESOLVABLE;
+          } else {
+            invalidOption = true;
+          }
+        } else {
+          invalidOption = true;
+        }
+        jsvUnLock(privacyAddrTypeVar);
+      }
+      // private addr cycle s
+      {
+        JsVar *privateAddrCycleSVar = jsvObjectGetChildIfExists(options, "addr_cycle_s");
+        if (privateAddrCycleSVar && jsvIsInt(privateAddrCycleSVar)) {
+          privacy->private_addr_cycle_s = jsvGetInteger(privateAddrCycleSVar);
+        } else {
+          invalidOption = true;
+        }
+        jsvUnLock(privateAddrCycleSVar);
+      }
+    }
+    return !invalidOption;
+  }
+  return false;
+}
+
+JsVar *blePrivacyToVar(pm_privacy_params_t *privacy) {
+  if (privacy) {
+    // other options are only relevant if privacy_mode is something other than off
+    if (privacy->privacy_mode == BLE_GAP_PRIVACY_MODE_OFF) {
+      return jsvNewFromBool(false);
+    }
+    char *mode_str = "";
+    switch (privacy->privacy_mode) {
+      case BLE_GAP_PRIVACY_MODE_OFF:
+        mode_str = "off";
+        break;
+      case BLE_GAP_PRIVACY_MODE_DEVICE_PRIVACY:
+        mode_str = "device_privacy";
+        break;
+      case BLE_GAP_PRIVACY_MODE_NETWORK_PRIVACY:
+        mode_str = "network_privacy";
+        break;
+    }
+    char *addr_type_str = "";
+    switch (privacy->private_addr_type) {
+      case BLE_GAP_ADDR_TYPE_RANDOM_PRIVATE_RESOLVABLE:
+        addr_type_str = "random_private_resolvable";
+        break;
+      case BLE_GAP_ADDR_TYPE_RANDOM_PRIVATE_NON_RESOLVABLE:
+        addr_type_str = "random_private_non_resolvable";
+        break;
+    }
+    JsVar *result = jsvNewObject();
+    if (!result) return 0;
+    jsvObjectSetChildAndUnLock(result, "mode", jsvNewFromString(mode_str));
+    jsvObjectSetChildAndUnLock(result, "addr_type", jsvNewFromString(addr_type_str));
+    jsvObjectSetChildAndUnLock(result, "addr_cycle_s", jsvNewFromInteger(privacy->private_addr_cycle_s));
+    return result;
+  }
+  return 0;
+}
+#endif // PEER_MANAGER_ENABLED && ESPR_BLE_PRIVATE_ADDRESS_SUPPORT
+
 /// Queue an event on the 'NRF' object. Also calls jshHadEvent()
 void bleQueueEventAndUnLock(const char *name, JsVar *data) {
   //jsiConsolePrintf("[%s] %j\n", name, data);
@@ -227,9 +337,10 @@ void bleGetWriteEventName(char *eventName, uint16_t handle) {
   itostr(handle, &eventName[strlen(eventName)], 16);
 }
 
+// ESP32 is defined in esp32_gatts_func
+#ifdef NRF5X
 /// Look up the characteristic's handle from the UUID. returns BLE_GATT_HANDLE_INVALID if not found
 uint16_t bleGetGATTHandle(ble_uuid_t char_uuid) {
-#ifdef NRF5X
   // Update value and notify/indicate if appropriate
   uint16_t char_handle;
   ble_uuid_t uuid_it;
@@ -257,11 +368,9 @@ uint16_t bleGetGATTHandle(ble_uuid_t char_uuid) {
     }
     char_handle++;
   }
-#else
-  jsiConsolePrintf("FIXME\n");
-#endif
   return BLE_GATT_HANDLE_INVALID;
 }
+#endif
 
 /// Add a new bluetooth event to the queue with a buffer of data
 void jsble_queue_pending_buf(BLEPending blep, uint16_t data, char *ptr, size_t len) {
@@ -336,7 +445,7 @@ bool jsble_exec_pending_common(BLEPending blep, uint16_t data, unsigned char *bu
     bleCompleteTaskFail(bleGetCurrentTask(), 0);
     break;
   case BLEP_TASK_FAIL_CONN_TIMEOUT:
-    bleCompleteTaskFailAndUnLock(bleGetCurrentTask(), jsvNewFromString("Connection Timeout"));
+    bleCompleteTaskFailAndUnLock(bleGetCurrentTask(), jsvVarPrintf("Connection Timeout (%d)", data));
     break;
   case BLEP_TASK_FAIL_DISCONNECTED:
     bleCompleteTaskFailAndUnLock(bleGetCurrentTask(), jsvNewFromString("Disconnected"));
@@ -455,6 +564,22 @@ bool jsble_exec_pending_common(BLEPending blep, uint16_t data, unsigned char *bu
    break;
   }
 #endif // CENTRAL_LINK_COUNT > 0
+   case BLEP_WRITE: {
+     JsVar *evt = jsvNewObject();
+     if (evt) {
+       JsVar *str = jsvNewStringOfLength(bufferLen, (char*)buffer);
+       if (str) {
+         JsVar *ab = jsvNewArrayBufferFromString(str, bufferLen);
+         jsvUnLock(str);
+         jsvObjectSetChildAndUnLock(evt, "data", ab);
+       }
+       char eventName[12];
+       bleGetWriteEventName(eventName, data);
+       jsiQueueObjectCallbacks(execInfo.root, eventName, &evt, 1);
+       jsvUnLock(evt);
+     }
+     break;
+   }
   default:
     return false;
   }

@@ -21,6 +21,11 @@ void graphicsInternalFlip()
   lcdFlip_SPILCD(&graphicsInternal);
 }
 
+void banglejs_setLCDOverlay_impl(JsVar *imgVar, int x, int y)
+{
+  lcdSetOverlay_SPILCD(imgVar, x, y);
+}
+
 void banglejs_setLCDPowerController_impl(bool isOn) {
   // TODO: LCD_CONTROLLER_GC9A01 - has an enable/power pin
   if (isOn) { // wake

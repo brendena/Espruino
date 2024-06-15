@@ -27,9 +27,9 @@
 #endif
 
 #ifndef BUILDNUMBER
-#define JS_VERSION "2v21"
+#define JS_VERSION "2v22"
 #else
-#define JS_VERSION "2v21." BUILDNUMBER
+#define JS_VERSION "2v22." BUILDNUMBER
 #endif
 /*
   In code:
@@ -349,6 +349,7 @@ typedef int64_t JsSysTime;
 #define JSPARSE_STACKTRACE_VAR "sTrace" // for errors/exceptions, a stack trace is stored as a string
 #define JSPARSE_MODULE_CACHE_NAME "modules"
 
+#ifndef assert
 #if !defined(NO_ASSERT)
  #ifdef USE_FLASH_MEMORY
    // Place assert strings into flash to save RAM
@@ -365,6 +366,7 @@ typedef int64_t JsSysTime;
  #endif
 #else
  #define assert(X) do { } while(0)
+#endif
 #endif
 
 /// Used when we have enums we want to squash down

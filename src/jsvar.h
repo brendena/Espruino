@@ -286,11 +286,14 @@ JSV_INLINEABLE unsigned char jsvGetLocks(JsVar *v);
 // For debugging/testing ONLY - maximum # of vars we are allowed to use
 void jsvSetMaxVarsUsed(unsigned int size);
 
-// Init/kill vars as a whole. If JSVAR_MALLOC is defined, a size can be specified (or 0 uses the old size)
+// Init/kill vars as a whole. If JSVAR_MALLOC is defined, a size can be specified (or 0 uses the old size). Calls jsvReset
 void jsvInit(unsigned int size);
+// wipe all JsVars, reset the free list
+void jsvReset();
+// de-init, un-allocates JsVars if they were allocated previously
 void jsvKill();
-void jsvSoftInit(); ///< called when loading from flash
-void jsvSoftKill(); ///< called when saving to flash
+void jsvSoftInit(); ///< called when loading from flash - reinstates empty list
+void jsvSoftKill(); ///< called when saving to flash - clears empty list to ensure code compacts better
 JsVar *jsvFindOrCreateRoot(); ///< Find or create the ROOT variable item - used mainly if recovering from a saved state.
 unsigned int jsvGetMemoryUsage(); ///< Get number of memory records (JsVars) used
 unsigned int jsvGetMemoryTotal(); ///< Get total amount of memory records
@@ -315,8 +318,13 @@ JsVar *jsvNewUTF8String(JsVar* dataString); ///< Create a new unicode string usi
 JsVar *jsvNewUTF8StringAndUnLock(JsVar* dataString); ///< Create a new unicode string using the given data string for backing
 #endif
 static ALWAYS_INLINE JsVar *jsvNewNull() { return jsvNewWithFlags(JSV_NULL); } ;///< Create a new null variable
-/** Create a new variable from a substring. argument must be a string. stridx = start char or str, maxLength = max number of characters (can be JSVAPPENDSTRINGVAR_MAXLENGTH)  */
+/** Create a new String from a substring in RAM. It is always writable. jsvNewFromStringVar can reference a non-writable string.
+The Argument must be a string. stridx = start char or str, maxLength = max number of characters (can be JSVAPPENDSTRINGVAR_MAXLENGTH) */
+JsVar *jsvNewWritableStringFromStringVar(const JsVar *str, size_t stridx, size_t maxLength);
+/** Create a new variable from a substring. If a Native or Flash String, the memory area will be referenced (so the new string may not be writable)
+The Argument must be a string. stridx = start char or str, maxLength = max number of characters (can be JSVAPPENDSTRINGVAR_MAXLENGTH) */
 JsVar *jsvNewFromStringVar(const JsVar *str, size_t stridx, size_t maxLength);
+/** Create a new writable string from a string (flash/native strings will be cloned, not referenced). argument must be a string. */
 JsVar *jsvNewFromStringVarComplete(JsVar *var);
 JsVar *jsvNewFromInteger(JsVarInt value);
 JsVar *jsvNewFromBool(bool value);
@@ -527,7 +535,7 @@ static ALWAYS_INLINE void jsvAppendCharacter(JsVar *var, char ch) { jsvAppendStr
 ///< Append the given UTF8 character to this string
 static ALWAYS_INLINE void jsvAppendUTF8Character(JsVar *var, int ch) {
   char utf8buf[4];
-  int utf8len = jsUTF8Encode(ch, utf8buf);
+  unsigned int utf8len = jsUTF8Encode(ch, utf8buf);
   jsvAppendStringBuf(var, utf8buf, utf8len);
 }
 #endif
@@ -666,7 +674,7 @@ JsVar *jsvNegateAndUnLock(JsVar *v);
  * ignoreParent is a, don't! */
 JsVar *jsvGetPathTo(JsVar *root, JsVar *element, int maxDepth, JsVar *ignoreParent);
 
-/// Copy this variable and return the locked copy
+/// Copy this variable and return the locked copy (if copyChildren=true, children are copied, but *not* deeply)
 JsVar *jsvCopy(JsVar *src, bool copyChildren);
 /** Copy only a name, not what it points to. ALTHOUGH the link to what it points to is maintained unless linkChildren=false.
     If keepAsName==false, this will be converted into a normal variable */

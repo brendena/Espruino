@@ -92,5 +92,7 @@ void jsbangle_exec_pending(IOEvent *event);
 void jsbangle_push_event(JsBangleEvent type, uint16_t value);
 
 
+void jswrap_banglejs_powerusage(JsVar *devices);
+
 //private bangle functions
 void _jswrap_banglejs_setLocked(bool isLocked, const char *reason);

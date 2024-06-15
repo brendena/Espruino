@@ -108,6 +108,7 @@ unsigned char jsvGetLocks(JsVar *v) { return (unsigned char)((v->flags>>JSV_LOCK
 #define JSV_IS_FUNCTION(f) ((f)==JSV_FUNCTION || (f)==JSV_FUNCTION_RETURN || (f)==JSV_NATIVE_FUNCTION)
 #define JSV_IS_ARRAYBUFFER(f) (f)==JSV_ARRAYBUFFER
 #define JSV_IS_NAME(f) ((f)>=_JSV_NAME_START && (f)<=_JSV_NAME_END)
+#define JSV_IS_NAME_INT(f) (f==JSV_NAME_INT_INT || (f>=JSV_NAME_STRING_INT_0 && f<=JSV_NAME_STRING_INT_MAX))
 #define JSV_IS_NAME_WITH_VALUE(f) ((f)>=_JSV_NAME_WITH_VALUE_START && (f)<=_JSV_NAME_WITH_VALUE_END)
 #ifdef ESPR_UNICODE_SUPPORT
 #define JSV_IS_UNICODE_STRING(f)  ((f)==JSV_UTF8_STRING || (f)==JSV_NAME_UTF8_STRING)
@@ -157,7 +158,7 @@ bool jsvIsName(const JsVar *v) { if (!v) return false; char f = v->flags&JSV_VAR
 bool jsvIsBasicName(const JsVar *v) { if (!v) return false; char f = v->flags&JSV_VARTYPEMASK;  return f>=JSV_NAME_STRING_0 && f<=JSV_NAME_STRING_MAX; } ///< Simple NAME that links to a variable via firstChild
 /// Names with values have firstChild set to a value - AND NOT A REFERENCE
 bool jsvIsNameWithValue(const JsVar *v) { if (!v) return false; char f = v->flags&JSV_VARTYPEMASK;  return JSV_IS_NAME_WITH_VALUE(f); }
-bool jsvIsNameInt(const JsVar *v) { if (!v) return false; char f = v->flags&JSV_VARTYPEMASK;  return f==JSV_NAME_INT_INT || (f>=JSV_NAME_STRING_INT_0 && f<=JSV_NAME_STRING_INT_MAX); } ///< Is this a NAME pointing to an Integer value
+bool jsvIsNameInt(const JsVar *v) { if (!v) return false; char f = v->flags&JSV_VARTYPEMASK;  return JSV_IS_NAME_INT(f); } ///< Is this a NAME pointing to an Integer value
 bool jsvIsNameIntInt(const JsVar *v) { return v && (v->flags&JSV_VARTYPEMASK)==JSV_NAME_INT_INT; }
 bool jsvIsNameIntBool(const JsVar *v) { return v && (v->flags&JSV_VARTYPEMASK)==JSV_NAME_INT_BOOL; }
 /// What happens when we access a variable that doesn't exist. We get a NAME where the next + previous siblings point to the object that may one day contain them
@@ -313,9 +314,12 @@ void jsvSoftKill() {
   jsvClearEmptyVarList();
 }
 
+#ifdef RESIZABLE_JSVARS
 /** This links all JsVars together, so we can have our nice
  * linked list of free JsVars. It returns the ref of the first
- * item - that we should set jsVarFirstEmpty to (if it is 0) */
+ * item - that we should set jsVarFirstEmpty to (if it is 0)
+ * It's just like jsvClearEmptyVarList but it can start from any point and doesn't set jsVarFirstEmpty
+ * */
 static JsVarRef jsvInitJsVars(JsVarRef start, unsigned int count) {
   JsVarRef i;
   for (i=start;i<start+count;i++) {
@@ -326,6 +330,21 @@ static JsVarRef jsvInitJsVars(JsVarRef start, unsigned int count) {
   }
   jsvSetNextSibling(jsvGetAddressOf((JsVarRef)(start+count-1)), (JsVarRef)0); // set the final one to 0
   return start;
+}
+#endif
+
+
+void jsvReset() {
+  jsVarFirstEmpty = 0; // jsvCreateEmptyVarList in jsvSoftInit sets this
+#ifdef RESIZABLE_JSVARS
+  unsigned int i;
+  for (i=0;i<jsVarsSize>>JSVAR_BLOCK_SHIFT;i++) {
+    memset(jsVarBlocks[i], 0, sizeof(JsVar) * JSVAR_BLOCK_SIZE);
+  }
+#else
+  memset(jsVars, 0, sizeof(JsVar)*jsVarsSize);
+#endif
+  jsvSoftInit();
 }
 
 void jsvInit(unsigned int size) {
@@ -354,8 +373,7 @@ void jsvInit(unsigned int size) {
   assert(size==JSVAR_CACHE_SIZE);
 #endif
 
-  jsVarFirstEmpty = jsvInitJsVars(1/*first*/, jsVarsSize);
-  jsvSoftInit();
+  jsvReset();
 }
 
 void jsvKill() {
@@ -1924,7 +1942,20 @@ void jsvAppendStringVar(JsVar *var, const JsVar *str, size_t stridx, size_t maxL
   jsvStringIteratorFree(&dst);
 }
 
-/** Create a new variable from a substring. argument must be a string. stridx = start char or str, maxLength = max number of characters (can be JSVAPPENDSTRINGVAR_MAXLENGTH) */
+/** Create a new String from a substring in RAM. It is always writable. jsvNewFromStringVar can reference a non-writable string.
+The Argument must be a string. stridx = start char or str, maxLength = max number of characters (can be JSVAPPENDSTRINGVAR_MAXLENGTH) */
+JsVar *jsvNewWritableStringFromStringVar(const JsVar *str, size_t stridx, size_t maxLength) {
+  JsVar *var = jsvNewFromEmptyString();
+  jsvAppendStringVar(var, str, stridx, maxLength);
+#ifdef ESPR_UNICODE_SUPPORT
+  if (jsvIsUTF8String(str))
+    var = jsvNewUTF8StringAndUnLock(var);
+#endif
+  return var;
+}
+
+/** Create a new variable from a substring. If a Native or Flash String, the memory area will be referenced (so the new string may not be writable)
+The Argument must be a string. stridx = start char or str, maxLength = max number of characters (can be JSVAPPENDSTRINGVAR_MAXLENGTH) */
 JsVar *jsvNewFromStringVar(const JsVar *str, size_t stridx, size_t maxLength) {
   if (jsvIsNativeString(str) || jsvIsFlashString(str)) {
     // if it's a flash string, just change the pointer (but we must check length)
@@ -1936,18 +1967,12 @@ JsVar *jsvNewFromStringVar(const JsVar *str, size_t stridx, size_t maxLength) {
     res->varData.nativeStr.len = (JsVarDataNativeStrLength)maxLength;
     return res;
   }
-  JsVar *var = jsvNewFromEmptyString();
-  jsvAppendStringVar(var, str, stridx, maxLength);
-#ifdef ESPR_UNICODE_SUPPORT
-  if (jsvIsUTF8String(str))
-    var = jsvNewUTF8StringAndUnLock(var);
-#endif
-  return var;
+  return jsvNewWritableStringFromStringVar(str, stridx, maxLength);
 }
 
-/** Create a new variable from a string. argument must be a string. */
+/** Create a new writable string from a string (flash/native strings will be cloned, not referenced). argument must be a string. */
 JsVar *jsvNewFromStringVarComplete(JsVar *var) {
-  return jsvNewFromStringVar(var, 0, JSVAPPENDSTRINGVAR_MAXLENGTH);
+  return jsvNewWritableStringFromStringVar(var, 0, JSVAPPENDSTRINGVAR_MAXLENGTH);
 }
 
 /** Append all of str to var. Both must be strings.  */
@@ -2463,11 +2488,12 @@ bool jsvIsVariableDefined(JsVar *a) {
  * repeatedly get the name, or evaluate getters. */
 JsVar *jsvGetValueOfName(JsVar *a) {
   if (!a) return 0;
-  if (jsvIsArrayBufferName(a)) return jsvArrayBufferGetFromName(a);
-  if (jsvIsNameInt(a)) return jsvNewFromInteger((JsVarInt)jsvGetFirstChildSigned(a));
-  if (jsvIsNameIntBool(a)) return jsvNewFromBool(jsvGetFirstChild(a)!=0);
+  JsVarFlags flags = a->flags&JSV_VARTYPEMASK;
+  if (flags==JSV_ARRAYBUFFERNAME/*jsvIsArrayBufferName(a)*/) return jsvArrayBufferGetFromName(a);
+  if (JSV_IS_NAME_INT(flags)/*jsvIsNameInt(a)*/) return jsvNewFromInteger((JsVarInt)jsvGetFirstChildSigned(a));
+  if (flags==JSV_NAME_INT_BOOL/*jsvIsNameIntBool(a)*/) return jsvNewFromBool(jsvGetFirstChild(a)!=0);
   assert(!jsvIsNameWithValue(a));
-  if (jsvIsName(a))
+  if (JSV_IS_NAME(flags))
     return jsvLockSafe(jsvGetFirstChild(a));
   return 0;
 }
@@ -2478,8 +2504,6 @@ void jsvCheckReferenceError(JsVar *a) {
     jsExceptionHere(JSET_REFERENCEERROR, "%q is not defined", a);
 }
 
-
-
 /** If a is a name skip it and go to what it points to - and so on (if repeat=true).
  * ALWAYS locks - so must unlock what it returns. It MAY
  * return 0. Throws a ReferenceError if variable is not defined,
@@ -2488,11 +2512,12 @@ void jsvCheckReferenceError(JsVar *a) {
  * gets used unless a NewChild overwrites it */
 JsVar *jsvSkipNameWithParent(JsVar *a, bool repeat, JsVar *parent) {
   if (!a) return 0;
-  if (jsvIsArrayBufferName(a)) return jsvArrayBufferGetFromName(a);
-  if (jsvIsNameInt(a)) return jsvNewFromInteger((JsVarInt)jsvGetFirstChildSigned(a));
-  if (jsvIsNameIntBool(a)) return jsvNewFromBool(jsvGetFirstChild(a)!=0);
+  JsVarFlags flags = a->flags&JSV_VARTYPEMASK;
+  if (flags==JSV_ARRAYBUFFERNAME/*jsvIsArrayBufferName(a)*/) return jsvArrayBufferGetFromName(a);
+  if (JSV_IS_NAME_INT(flags)/*jsvIsNameInt(a)*/) return jsvNewFromInteger((JsVarInt)jsvGetFirstChildSigned(a));
+  if (flags==JSV_NAME_INT_BOOL/*jsvIsNameIntBool(a)*/) return jsvNewFromBool(jsvGetFirstChild(a)!=0);
   JsVar *pa = jsvLockAgain(a);
-  while (jsvIsName(pa)) {
+  while (JSV_IS_NAME(flags)) {
     JsVarRef n = jsvGetFirstChild(pa);
     jsvUnLock(pa);
     if (!n) {
@@ -2501,6 +2526,7 @@ JsVar *jsvSkipNameWithParent(JsVar *a, bool repeat, JsVar *parent) {
       return 0;
     }
     pa = jsvLock(n);
+    flags = pa->flags&JSV_VARTYPEMASK;
     assert(pa!=a);
     if (!repeat) break;
   }
@@ -2977,7 +3003,7 @@ JsVar *jsvFindChildFromString(JsVar *parent, const char *name) {
       childref = jsvGetNextSibling(child);
     }
   } else { // 4 or less chars, so if 4 chars match, there is no StringExt + length matches, then we're good without jsvIsStringEqual
-    int charsInName = 0;
+    size_t charsInName = 0;
     while (name[charsInName])
       charsInName++;
     while (childref) {
@@ -3189,12 +3215,24 @@ JsVar *jsvObjectGetChildI(JsVar *obj, const char *name) {
 
 /// Same as jsvGetBoolAndUnLock(jsvObjectGetChildIfExists(obj, name))
 bool jsvObjectGetBoolChild(JsVar *obj, const char *name) {
-  return jsvGetBoolAndUnLock(jsvObjectGetChildIfExists(obj, name));
+  /* We could call jsvGetBoolAndUnLock(jsvObjectGetChildIfExists(obj, name)) here
+  but if we're accessing a NAME_INT it involves creating a new JsVar just to get the value out */
+  return jsvObjectGetIntegerChild(obj,name)!=0;
 }
 
 /// Same as jsvGetIntegerAndUnLock(jsvObjectGetChildIfExists(obj, name))
 JsVarInt jsvObjectGetIntegerChild(JsVar *obj, const char *name) {
-  return jsvGetIntegerAndUnLock(jsvObjectGetChildIfExists(obj, name));
+  if (!obj) return 0;
+  assert(jsvHasChildren(obj));
+  /* We could call jsvGetIntegerAndUnLock(jsvObjectGetChildIfExists(obj, name)) here
+  but if we're accessing a NAME_INT it involves creating a new JsVar just to get the value out */
+  JsVar *v = jsvFindChildFromString(obj, name);
+  if (jsvIsNameInt(v) || jsvIsNameIntBool(v)) {
+    JsVarInt vi = jsvGetFirstChildSigned(v);
+    jsvUnLock(v);
+    return vi;
+  }
+  return jsvGetIntegerAndUnLock(jsvSkipNameAndUnLock(v));
 }
 
 /// Same as jsvGetFloatAndUnLock(jsvObjectGetChildIfExists(obj, name))
@@ -3875,8 +3913,7 @@ JsVar *jsvMathsOp(JsVar *a, JsVar *b, int op) {
         // It's a string, but it can't be appended - don't copy as copying will just keep the same var type!
         // Instead we create a new string var by copying
         // opt: should we allocate a flat string here? but repeated appends would then be slow
-        v = jsvNewFromEmptyString(); // don't use jsvNewFromStringVar as this does a copy for native/flash strs too
-        if (v) jsvAppendStringVarComplete(v, da);
+        v = jsvNewFromStringVarComplete(da);
       } else // otherwise just copy it
         v = jsvCopy(da, false);
       if (v) // could be out of memory

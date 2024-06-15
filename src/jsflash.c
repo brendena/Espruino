@@ -662,10 +662,10 @@ char jsfStripDriveFromName(JsfFileName *name, bool explicitOnly){
     return drive;
   }
 #ifdef JSF_BANK2_START_ADDRESS
-  if (explicitOnly) return 0; // if explicitOnly==false, ensure *.js and .boot0 files go in C:
+  if (explicitOnly) return 0; // if explicitOnly==false, ensure *.js .boot0 .bootcde and library files (with no dots) go in C:
   int l = 0;
   while (name->c[l] && l<sizeof(JsfFileName)) l++;
-  if (strcmp(name,".boot0")==0 ||
+  if (strcmp(name,".boot0")==0 || strcmp(name,".bootcde")==0 || strchr(name,'.')==0 ||
       (name->c[l-3]=='.' && name->c[l-2]=='j' && name->c[l-1]=='s')) {
     return 'C';
   }
@@ -816,7 +816,10 @@ static uint32_t jsfBankFindFile(uint32_t bankAddress, uint32_t bankEndAddress, J
 
 /// Find a 'file' in the memory store. Return the address of data start (and header if returnedHeader!=0). Returns 0 if not found
 uint32_t jsfFindFile(JsfFileName name, JsfFileHeader *returnedHeader) {
-  char drive = jsfStripDriveFromName(&name, true/* ensure we search both drive if not explicitly requested */);
+#ifdef JSF_BANK2_START_ADDRESS
+  char drive =
+#endif
+    jsfStripDriveFromName(&name, true/* ensure we search both drive if not explicitly requested */);
   uint32_t a = jsfCacheFind(name, returnedHeader);
   if (a!=JSF_CACHE_NOT_FOUND) return a;
   JsfFileHeader header;
@@ -1454,7 +1457,6 @@ void jsfResetStorage() {
   jsiConsolePrintf("Erase complete.\n");
 #if ESPR_STORAGE_INITIAL_CONTENTS
   // if we store initial contents, write them here after erasing storage
-  jsiConsolePrintf("Writing initial storage contents...\n");
   extern const unsigned char jsfStorageInitialContents[];
   extern const int jsfStorageInitialContentLength;
   if (jsfStorageInitialContentLength<FLASH_SAVED_CODE_LENGTH) {

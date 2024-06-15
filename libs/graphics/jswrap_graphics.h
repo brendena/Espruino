@@ -57,7 +57,7 @@ JsVarInt jswrap_graphics_getColorX(JsVar *parent, bool isForeground);
 JsVar *jswrap_graphics_setClipRect(JsVar *parent, int x1, int y1, int x2, int y2);
 JsVar *jswrap_graphics_setFontSizeX(JsVar *parent, int size, bool isVectorFont);
 JsVar *jswrap_graphics_setFontCustom(JsVar *parent, JsVar *bitmap, int firstChar, JsVar *width, int height);
-JsVar *jswrap_graphics_setFontPBF(JsVar *parent, JsVar *file);
+JsVar *jswrap_graphics_setFontPBF(JsVar *parent, JsVar *file, int scale);
 JsVar *jswrap_graphics_setFontAlign(JsVar *parent, int x, int y, int r);
 JsVar *jswrap_graphics_setFont(JsVar *parent, JsVar *name, int size);
 JsVar *jswrap_graphics_getFont(JsVar *parent);
@@ -93,7 +93,7 @@ JsVar *jswrap_graphics_transformVertices(JsVar *parent, JsVar *verts, JsVar *tra
 JsVar *jswrap_graphics_floodFill(JsVar *parent, int x, int y, JsVar *col);
 JsVar *jswrap_graphics_theme();
 JsVar *jswrap_graphics_setTheme(JsVar *parent, JsVar *theme);
-
+JsVar *jswrap_graphics_filter(JsVar *parent, JsVar *filter, JsVar *options);
 
 /// Info about an image to be used for rendering
 typedef struct {
@@ -120,8 +120,15 @@ void _jswrap_graphics_freeImageInfo(GfxDrawImageInfo *info);
  */
 bool _jswrap_graphics_parseImage(JsGraphics *gfx, JsVar *image, size_t imageOffset, GfxDrawImageInfo *info);
 
+/// When using drawImages, how should images be composed
+typedef enum {
+  GFXDILC_REPLACE, //< Normal, replace unless transparent
+  GFXDILC_ADD, //< add to what's there
+  GFXDILC_OR,  //< binary OR to what's there
+  GFXDILC_XOR  //< binary XOR with what's there
+} GfxDrawImageLayerCompose;
 
-/// This is for rotating and scaling layers
+/// This is for rotating and scaling layers with drawImages
 typedef struct {
   int x1,y1,x2,y2; //x2/y2 is exclusive
   double rotate; // radians
@@ -135,9 +142,10 @@ typedef struct {
   int sx,sy; //< iterator X increment
   int px,py; //< y iterator position
   int qx,qy; //< x iterator position
+  GfxDrawImageLayerCompose compose; //< How should this layer be composed onto previous layers?
 } GfxDrawImageLayer;
 
-bool _jswrap_drawImageLayerGetPixel(GfxDrawImageLayer *l, unsigned int *result);
+bool _jswrap_drawImageLayerGetPixel(GfxDrawImageLayer *l, uint32_t *result);
 void _jswrap_drawImageLayerInit(GfxDrawImageLayer *l);
 void _jswrap_drawImageLayerSetStart(GfxDrawImageLayer *l, int x, int y);
 void _jswrap_drawImageLayerStartX(GfxDrawImageLayer *l);

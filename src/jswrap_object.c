@@ -140,7 +140,15 @@ JsVar *jswrap_object_toString(JsVar *parent, JsVar *arg0) {
   "generate" : "jswrap_object_clone",
   "return" : ["JsVar","A copy of this Object"]
 }
-Copy this object completely
+Copy this object to a new object, but as a shallow copy. This has a similar effect to calling `Object.assign({}, obj)`.
+
+```
+orig = { a : 1, b : [ 2, 3 ] }
+copy = orig.clone();
+// copy = { a : 1, b : [ 2, 3 ] }
+```
+
+**Note:** This is not a standard JavaScript function, but is unique to Espruino
  */
 JsVar *jswrap_object_clone(JsVar *parent) {
   if (!parent) return 0;
@@ -183,7 +191,7 @@ static void _jswrap_object_keys_or_property_names_iterator(
   unsigned int i;
   unsigned char symbolCount = READ_FLASH_UINT8(&symbols->symbolCount);
   for (i=0;i<symbolCount;i++) {
-    unsigned short strOffset = READ_FLASH_UINT16(&symbols->symbols[i].strOffset);
+    unsigned short strOffset = JSWSYMPTR_OFFSET(&symbols->symbols[i]);
 #ifndef USE_FLASH_MEMORY
     JsVar *name = jsvNewFromString(&symbols->symbolChars[strOffset]);
 #else

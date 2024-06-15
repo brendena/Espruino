@@ -475,7 +475,7 @@ static void jslLexString() {
         // copy data back in
         for (unsigned int i=0;i<len-1;i++)
             jsvStringIteratorAppend(&it, buf[i]);
-      }
+      } else
 #endif
       {
         jsvStringIteratorAppend(&it, lex->currCh);
@@ -603,7 +603,7 @@ static void jslGetRawString() {
   } else {
     /* if it will fit in a single string, allocate one and fill it up! */
     lex->tokenValue = jsvNewWithFlags(JSV_STRING_0 + length);
-    for (int i=0;i<length;i++) {
+    for (size_t i=0;i<length;i++) {
       jslGetNextCh();
       lex->tokenValue->varData.str[i] = lex->currCh;
     }
@@ -1361,7 +1361,9 @@ JsVar *jslNewStringFromLexer(JslCharPos *charFrom, size_t charTo) {
   jsvSetCharactersInVar(block, blockChars);
   jsvUnLock(block);
   // Just make sure we only assert if there's a bug here. If we just ran out of memory or at end of string it's ok
+#ifndef NO_ASSERT
   assert((totalStringLength == jsvGetStringLength(var)) || (jsErrorFlags&JSERR_MEMORY) || !jsvStringIteratorHasChar(&it));
+#endif
   jsvStringIteratorFree(&it);
 
 

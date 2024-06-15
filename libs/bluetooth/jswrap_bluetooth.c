@@ -777,7 +777,7 @@ void jswrap_ble_setAddress(JsVar *address) {
     "type" : "staticmethod",
     "class" : "NRF",
     "name" : "resolveAddress",
-    "#if" : "defined(NRF52_SERIES) && PEER_MANAGER_ENABLED",
+    "#if" : "defined(NRF52_SERIES)",
     "generate" : "jswrap_ble_resolveAddress",
     "params" : [
       ["options" ,"JsVar", "The address that should be resolved."]
@@ -814,7 +814,7 @@ You can get the current connection's address using `NRF.getSecurityStatus().conn
 so can for instance do `NRF.resolveAddress(NRF.getSecurityStatus().connected_addr)`.
 */
 JsVar *jswrap_ble_resolveAddress(JsVar *address) {
-#if defined(NRF52_SERIES) && PEER_MANAGER_ENABLED
+#if defined(NRF52_SERIES) && PEER_MANAGER_ENABLED==1
   return jsble_resolveAddress(address);
 #else
   jsExceptionHere(JSET_ERROR, "Not implemented");
@@ -1744,6 +1744,9 @@ void jswrap_ble_updateServices(JsVar *data) {
                     ok = false;
                 }
               }
+#endif
+#ifdef ESP32
+              gatts_update_service(char_handle, vPtr, vLen, notification_requested, indication_requested);
 #endif
             }
           }
@@ -3599,6 +3602,9 @@ NRF.setSecurity({
   encryptUart : bool // default false (unless oob or passkey specified)
                      // This sets the BLE UART service such that it
                      // is encrypted and can only be used from a paired connection
+  privacy : // default false, true to enable with (ideally sensible) defaults,
+            // or an object defining BLE privacy / random address options - see below for more info
+            // only available if Espruino was compiled with private address support (like for example on Bangle.js 2)
 });
 ```
 
@@ -3672,6 +3678,53 @@ NRF.setServices({
 **Note:** If `passkey` or `oob` is specified, the Nordic UART service (if
 enabled) will automatically be set to require encryption, but otherwise it is
 open.
+
+On Bangle.js 2, the `privacy` parameter can be used to set this device's BLE privacy / random address settings.
+
+The privacy feature provides a way to avoid being tracked over a period of time.
+This works by replacing the real BLE address with a random private address,
+that automatically changes at a specified interval.
+
+If a `"random_private_resolvable"` address is used, that address is generated with the help
+of an identity resolving key (IRK), that is exchanged during bonding.
+This allows a bonded device to still identify another device that is using a random private resolvable address.
+
+Note that, while this can help against being tracked, there are other ways a Bluetooth device can reveal its identity.
+For example, the name or services it advertises may be unique enough.
+
+```
+NRF.setSecurity({
+  privacy: {
+    mode : "off"/"device_privacy"/"network_privacy" // The privacy mode that should be used.
+    addr_type : "random_private_resolvable"/"random_private_non_resolvable" // The type of address to use.
+    addr_cycle_s : int // How often the address should change, in seconds.
+  }
+});
+// enabled with (ideally sensible) defaults of:
+// mode: device_privacy
+// addr_type: random_private_resolvable
+// addr_cycle_s: 0 (use default address change interval)
+NRF.setSecurity({
+  privacy: 1
+});
+```
+
+`mode` can be one of:
+
+* `"off"` - Use the real address.
+* `"device_privacy"` - Use a private address.
+* `"network_privacy"` - Use a private address,
+                        and reject a peer that uses its real address if we know that peer's IRK.
+
+If `mode` is `"off"`, all other fields are ignored and become optional.
+
+`addr_type` can be one of:
+
+* `"random_private_resolvable"` - Address that can be resolved by a bonded peer that knows our IRK.
+* `"random_private_non_resolvable"` - Address that cannot be resolved.
+
+`addr_cycle_s` must be an integer. Pass `0` to use the default address change interval.
+The default is usually to change the address every 15 minutes (or 900 seconds).
 */
 void jswrap_ble_setSecurity(JsVar *options) {
   if (!jsvIsObject(options) && !jsvIsUndefined(options))
@@ -3688,6 +3741,11 @@ void jswrap_ble_setSecurity(JsVar *options) {
 /*TYPESCRIPT
 type NRFSecurityStatus = {
   advertising: boolean,
+  privacy?: false || {
+    mode: string,
+    addr_type: string,
+    addr_cycle_s: number,
+  },
 } & (
   {
     connected: true,
@@ -3724,6 +3782,8 @@ peripheral connection:
   bonded          // The peer is bonded with us
   advertising     // Are we currently advertising?
   connected_addr  // If connected=true, the MAC address of the currently connected device
+  privacy         // Current BLE privacy / random address settings.
+                  // Only present if Espruino was compiled with private address support (like for example on Bangle.js 2).
 }
 ```
 
@@ -4561,5 +4621,33 @@ JsVar *jswrap_ble_BluetoothRemoteGATTCharacteristic_stopNotifications(JsVar *cha
 #else
   jsExceptionHere(JSET_ERROR, "Unimplemented");
   return 0;
+#endif
+}
+
+
+/*JSON{
+  "type" : "powerusage",
+  "generate" : "jswrap_ble_powerusage"
+}*/
+void jswrap_ble_powerusage(JsVar *devices) {
+#ifdef NRF5X
+  // https://devzone.nordicsemi.com/power/w/opp/2/online-power-profiler-for-bluetooth-le
+  if (jsble_has_peripheral_connection()) {
+    int perSec = 800 / blePeriphConnectionInterval; // blePeriphConnectionInterval is in units of 1.25ms
+    jsvObjectSetChildAndUnLock(devices, "BLE_periph", jsvNewFromInteger(5*perSec)); // ~5uA per connection interval
+  }
+  if (jsble_has_central_connection()) {
+    jsvObjectSetChildAndUnLock(devices, "BLE_central", jsvNewFromInteger(500));
+    // Could do finer grained central connection
+  }
+  if (bleStatus & BLE_IS_ADVERTISING) {
+    int perSec = 1600 / bleAdvertisingInterval; // bleAdvertisingInterval is in units of 0.625ms
+    jsvObjectSetChildAndUnLock(devices, "BLE_advertise", jsvNewFromInteger(12*perSec)); // ~12uA per advertisement
+    // Could try and take advertising length into account?
+  }
+  if (bleStatus & BLE_IS_SCANNING) {
+    jsvObjectSetChildAndUnLock(devices, "BLE_scan", jsvNewFromInteger(10000));
+    // Could try and take advertising length into account?
+  }
 #endif
 }
