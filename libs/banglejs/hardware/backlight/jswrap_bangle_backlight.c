@@ -1,5 +1,4 @@
 #include "jswrap_bangle_backlight.h"
-#include "bangle_backlight_impl.c"
 
 /// LCD Brightness - 255=full
 uint8_t lcdBrightness;

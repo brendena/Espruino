@@ -1,5 +1,4 @@
 #include "bangle_display_impl.h"
-#include "bangle_display_impl.c"
 /*JSON{
     "type" : "staticmethod",
     "class" : "Bangle",

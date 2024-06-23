@@ -412,9 +412,17 @@ ifeq ($(USE_BANGLEJS),1)
 WRAPPERSOURCES += libs/banglejs/jswrap_bangle.c
 WRAPPERSOURCES += libs/banglejs/hardware/display/jswrap_bangle_display.c
 WRAPPERSOURCES += libs/banglejs/hardware/backlight/jswrap_bangle_backlight.c
+WRAPPERSOURCES += libs/banglejs/hardware/touch/jswrap_bangle_touch.c
+
 SOURCES        += libs/banglejs/hardware/hardware_impl.c
+
 SOURCES        += libs/banglejs/hardware/backlight/jswrap_bangle_backlight.c
 SOURCES        += libs/banglejs/hardware/display/jswrap_bangle_display.c
+SOURCES        += libs/banglejs/hardware/touch/jswrap_bangle_touch.c
+
+SOURCES        += libs/banglejs/hardware/backlight/bangle_backlight_impl.c
+SOURCES        += libs/banglejs/hardware/display/bangle_display_impl.c
+SOURCES        += libs/banglejs/hardware/touch/bangle_touch_impl.c
 #DEFINES += -DBANGLEJS for some reason BANGLE_1 doesn't use this
 endif
 

@@ -16,6 +16,7 @@
 #include "jspin.h"
 #include "hardware/backlight/jswrap_bangle_backlight.h"
 #include "hardware/display/jswrap_bangle_display.h"
+#include "hardware/touch/jswrap_bangle_touch.h"
 
 void jswrap_banglejs_setLCDTimeout(JsVarFloat timeout);
 void jswrap_banglejs_setLocked(bool isLocked);
@@ -83,9 +84,6 @@ bool jswrap_banglejs_gps_character(char ch);
  */
 void jswrap_banglejs_kickPollWatchdog();
 
-#ifdef EMULATED
-extern void touchHandlerInternal(int tx, int ty, int pts, int gesture);
-#endif
 
 
 /// Called from jsinteractive when an event is parsed from the event queue for Bangle.js (executed outside IRQ)
@@ -98,3 +96,5 @@ void jswrap_banglejs_powerusage(JsVar *devices);
 
 //private bangle functions
 void _jswrap_banglejs_setLocked(bool isLocked, const char *reason);
+
+extern JsBangleTasks bangleTasks;
