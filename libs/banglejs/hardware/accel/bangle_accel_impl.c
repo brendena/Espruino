@@ -15,6 +15,9 @@ JsVar * banglejs_accel_i2c_Rd(JsVarInt reg, JsVarInt cnt)
 #endif
 }
 
+ESPR_WEAK bool banglejs_accel_state_impl(unsigned char *tapped){return 0;}
+ESPR_WEAK void banglejs_accel_get_pos_impl(short *x,short *y, short *z){};
+
 
 ESPR_WEAK void banglejs_accel_init_impl(bool firstRun){}
 ESPR_WEAK void  banglejs_accel_off_impl(){}

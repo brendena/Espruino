@@ -20,4 +20,27 @@ void banglejs_accel_off_impl(){
     jswrap_banglejs_accelWr(0x1B,0);
 }
 
+bool banglejs_accel_state_impl(unsigned char *tapped)
+{
+    //no tapped data
+    *tapped=0;
+    unsigned char buf[2] ={0x16,0}; // INT_SOURCE1
+    // read interrupt source data
+    jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
+    jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 1, buf, true);
+    return (buf[0]&16)!=0; // DRDY
+}
+
+void banglejs_accel_get_pos_impl(short *x, short *y,  short *z)
+{
+    unsigned char buf[6];
+    buf[0] = 6;
+    jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
+    jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 6, buf, true);
+    *x = (buf[1]<<8)|buf[0];
+    *y = (buf[3]<<8)|buf[2];
+    *z = (buf[5]<<8)|buf[4];
+}
+
+
 #endif

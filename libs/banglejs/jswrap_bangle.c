@@ -1112,94 +1112,32 @@ void peripheralPollHandler() {
   }
 #endif // MAG_I2C
 #ifdef ACCEL_I2C
-#ifdef ACCEL_DEVICE_KX023
-  // poll KX023 accelerometer (no other way as IRQ line seems disconnected!)
-  // read interrupt source data
-  buf[0]=0x12; // INS1
-  jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
-  jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 2, buf, true);
-  // 0 -> 0x12 INS1 - tap event
-  // 1 -> 0x13 INS2 - what kind of event
-  bool hasAccelData = (buf[1]&16)!=0; // DRDY
-  int tapType = (buf[1]>>2)&3; // TDTS0/1
-  if (tapType) {
-    tapInfo = buf[0] | (tapType<<6);
-  }
-  if (tapType) {
-    // wake on tap, for front (for Bangle.js 2)
-#ifdef BANGLEJS_Q3
-    if ((bangleFlags&JSBF_WAKEON_TOUCH) && (tapInfo&2)/*front*/)
+  unsigned char tapped;
+  bool hasAccelData = banglejs_accel_state_impl(&tapped);
+
+  if(tapped)
+  {
+  // wake on tap, for front (for Bangle.js 2)
+    if ((bangleFlags&JSBF_WAKEON_TOUCH) && tapped == ACCEL_TG_TAP /*front*/)
       wakeUpBangle("tap");
-#endif
     // double tap
-    if ((bangleFlags&JSBF_WAKEON_DBLTAP) && (tapInfo&2)/*front*/ && (tapInfo&0x80)/*double-tap*/)
+    if ((bangleFlags&JSBF_WAKEON_DBLTAP) && tapped == ACCEL_TG_DOUBLE_TAP/*double-tap*/)
       wakeUpBangle("doubleTap");
 
     // tap ignores lock
     bangleTasks |= JSBT_ACCEL_TAPPED;
     jshHadEvent();
-
-    // clear the IRQ flags
-    buf[0]=0x17;
-    jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
-    jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 1, buf, true);
   }
-#endif
-#ifdef ACCEL_DEVICE_KXTJ3_1057
-  // read interrupt source data
-  buf[0]=0x16; // INT_SOURCE1
-  jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
-  jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 1, buf, true);
-  bool hasAccelData = (buf[0]&16)!=0; // DRDY
-#endif
-#ifdef ACCEL_DEVICE_KX126
-  // read interrupt source data (INS1 and INS2 registers)
-  buf[0]=KX126_INS1;
-  jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
-  jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 2, buf, true);
-  // 0 -> INS1 - step counter & tap events
-  // 1 -> INS2 - what kind of event
-  bool hasAccelData = (buf[1] & KX126_INS2_DRDY)!=0; // Is new data ready?
-  int tapType = (buf[1]>>2)&3; // TDTS0/1
-  if (tapType) {
-    // report tap
-    tapInfo = buf[0] | (tapType<<6);
-    bool handled = false;
-    // wake on tap, for front (for Dickens)
-#ifdef DICKENS
-    if ((bangleFlags&JSBF_WAKEON_TOUCH) && (tapInfo&1))
-      handled = wakeUpBangle("tap");
-    }
-#endif
-    if (!handled)
-      bangleTasks |= JSBT_ACCEL_TAPPED;
-    jshHadEvent();
-  }
-  // clear the IRQ flags
-  buf[0]=KX126_INT_REL;
-  jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
-  jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 1, buf, true);
-#endif
   if (hasAccelData) {
-#ifdef ACCEL_DEVICE_KX126
-    buf[0]=KX126_XOUT_L;
-    jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
-#else
-    buf[0]=6;
-    jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
-#endif
-    jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 6, buf, true);
-    // work out current reading in 16 bit
-    short newx = (buf[1]<<8)|buf[0];
-    short newy = (buf[3]<<8)|buf[2];
-    short newz = (buf[5]<<8)|buf[4];
+    short newx,newy,newz;
+    banglejs_accel_get_pos_impl(&newx,&newy,&newz);
 #ifdef BANGLEJS_Q3
     newx = -newx; //consistent directions with Bangle
     newz = -newz;
 #endif
-#ifdef ACCEL_DEVICE_KX126
-    newy = -newy;
-#endif
+
+
+
 #ifdef LCD_ROTATION
   #if LCD_ROTATION == 180
     newy = -newy;

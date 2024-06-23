@@ -43,4 +43,46 @@ void banglejs_accel_off_impl(){
     jswrap_banglejs_accelWr(0x18,0x0a);
 }
 
+bool banglejs_accel_state_impl(unsigned char *tapped)
+{
+  // poll KX023 accelerometer (no other way as IRQ line seems disconnected!)
+  // read interrupt source data
+  unsigned char buf[2] ={0x12,0}; // INS1
+  jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
+  jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 2, buf, true);
+  // 0 -> 0x12 INS1 - tap event
+  // 1 -> 0x13 INS2 - what kind of event
+  bool hasAccelData = (buf[1]&16)!=0; // DRDY
+  int tapType = (buf[1]>>2)&3; // TDTS0/1
+  if (tapType) {
+    tapType = buf[0] | (tapType<<6);
+    if(tapType&2){
+        (*tapped) = ACCEL_TG_TAP;
+    }
+    else{
+        (*tapped) = ACCEL_TG_NONE;
+    }
+    if(tapType&0x80){
+        (*tapped) = ACCEL_TG_DOUBLE_TAP;
+    }
+
+    // clear the IRQ flags
+    buf[0]=0x17;
+    jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
+    jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 1, buf, true);
+  }
+  return hasAccelData;
+}
+void banglejs_accel_get_pos_impl(short *x, short *y,  short *z)
+{
+    unsigned char buf[6];
+    buf[0] = 6;
+    jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
+    jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 6, buf, true);
+    *x = (buf[1]<<8)|buf[0];
+    *y = (buf[3]<<8)|buf[2];
+    *z = (buf[5]<<8)|buf[4];
+}
+
+
 #endif

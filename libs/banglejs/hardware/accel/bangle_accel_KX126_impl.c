@@ -33,4 +33,50 @@ void banglejs_accel_off_impl(){
     jswrap_banglejs_accelWr(KX126_CNTL1,0);
 }
 
+bool banglejs_accel_state_impl(unsigned char *tapped)
+{
+    // read interrupt source data (INS1 and INS2 registers)
+    unsigned char buf[2] ={KX126_INS1,0}; 
+    jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
+    jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 2, buf, true);
+    // 0 -> INS1 - step counter & tap events
+    // 1 -> INS2 - what kind of event
+    bool hasAccelData = (buf[1] & KX126_INS2_DRDY)!=0; // Is new data ready?
+    int tapType = (buf[1]>>2)&3; // TDTS0/1
+    if (tapType) {
+        // report tap
+        tapInfo = buf[0] | (tapType<<6);
+        if(tapInfo&1)
+        {
+            *tapped = ACCEL_TG_TAP;
+        }
+        else
+        {
+            *tapped = ACCEL_TG_NONE;
+        }
+    
+    }
+
+    // clear the IRQ flags
+    buf[0]=KX126_INT_REL;
+    jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
+    jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 1, buf, true);
+    return hasAccelData;
+}
+
+void banglejs_accel_get_pos_impl(short *x, short *y,  short *z)
+{
+    unsigned char buf[6];
+    buf[0] = KX126_XOUT_L;
+    jsi2cWrite(ACCEL_I2C, ACCEL_ADDR, 1, buf, false);
+    jsi2cRead(ACCEL_I2C, ACCEL_ADDR, 6, buf, true);
+    *x = (buf[1]<<8)|buf[0];
+    *y = (buf[3]<<8)|buf[2];
+    *z = (buf[5]<<8)|buf[4];
+
+    //need to flip y
+    *y = -(*y);
+}
+
+
 #endif

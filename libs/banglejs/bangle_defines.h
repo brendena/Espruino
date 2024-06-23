@@ -139,6 +139,11 @@ typedef enum {
   TG_SWIPE_DOWN,
 } TouchGestureType;
 
+typedef enum {
+  ACCEL_TG_NONE,
+  ACCEL_TG_TAP,
+  ACCEL_TG_DOUBLE_TAP,
+} AccelTouchGestureType;
 
 typedef enum {
   ESPR_CMD_I2C_WRITE = 1,
