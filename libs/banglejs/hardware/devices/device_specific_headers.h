@@ -35,3 +35,21 @@
 #ifndef MAG_MAX_RANGE
     #define MAG_MAX_RANGE 500 // maximum range of readings allowed between magmin/magmax. In the UK at ~20uT 250 is ok, and the max field strength us ~40uT
 #endif
+
+
+//[hack] for pressure sensor
+#ifdef PRESSURE_DEVICE_SPL06_007
+    #ifndef PRESSURE_DEVICE_SPL06_007_EN
+        #define PRESSURE_DEVICE_SPL06_007_EN 1
+    #endif
+#endif
+#ifdef PRESSURE_DEVICE_BMP280
+    #ifndef PRESSURE_DEVICE_BMP280_007_EN
+        #define PRESSURE_DEVICE_BMP280_007_EN 1
+    #endif
+#endif
+#ifdef PRESSURE_DEVICE_HP203
+    #ifndef PRESSURE_DEVICE_HP203_EN
+        #define PRESSURE_DEVICE_HP203_EN 1
+    #endif
+#endif

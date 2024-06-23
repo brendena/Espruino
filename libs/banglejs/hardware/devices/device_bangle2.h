@@ -15,4 +15,12 @@
     #define HRM_I2C &i2cHRM
     #define GPS_UART EV_SERIAL1
     #define HEARTRATE 1
+
+//pressure defines
+    #define PRESSURE_DEVICE_SPL06_007 1 // BMP280 already defined
+    extern bool pressureBMP280Enabled;
+    extern bool pressureSPL06Enabled;
+    #define PRESSURE_DEVICE_BMP280_EN pressureBMP280Enabled
+    #define PRESSURE_DEVICE_SPL06_007_EN pressureSPL06Enabled 
+
 #endif

@@ -157,6 +157,8 @@ typedef struct ESPR_CMD_I2C{
   uint32_t data;
 }ESPR_cmd_i2c;
 
+
+double barometerSeaLevelPressure =  1013.25; // Standard atmospheric pressure (millibars)
 #define SIZE_OF_CMD_I2C(arr) (sizeof(arr)/sizeof(ESPR_cmd_i2c))
 
 

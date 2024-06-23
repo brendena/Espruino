@@ -415,6 +415,7 @@ WRAPPERSOURCES += libs/banglejs/hardware/backlight/jswrap_bangle_backlight.c
 WRAPPERSOURCES += libs/banglejs/hardware/touch/jswrap_bangle_touch.c
 WRAPPERSOURCES += libs/banglejs/hardware/accel/jswrap_bangle_accel.c
 WRAPPERSOURCES += libs/banglejs/hardware/compass/jswrap_bangle_compass.c
+WRAPPERSOURCES += libs/banglejs/hardware/barometer/jswrap_bangle_barometer.c
 
 SOURCES        += libs/banglejs/hardware/hardware_impl.c
 SOURCES        += libs/banglejs/hardware/cpu_hardware/bangle_cpu_hardware_impl.c
@@ -424,12 +425,14 @@ SOURCES        += libs/banglejs/hardware/display/jswrap_bangle_display.c
 SOURCES        += libs/banglejs/hardware/touch/jswrap_bangle_touch.c
 SOURCES        += libs/banglejs/hardware/accel/jswrap_bangle_accel.c
 SOURCES        += libs/banglejs/hardware/compass/jswrap_bangle_compass.c
+SOURCES        += libs/banglejs/hardware/barometer/jswrap_bangle_barometer.c
 
 SOURCES        += libs/banglejs/hardware/backlight/bangle_backlight_impl.c
 SOURCES        += libs/banglejs/hardware/display/bangle_display_impl.c
 SOURCES        += libs/banglejs/hardware/touch/bangle_touch_impl.c
 SOURCES        += libs/banglejs/hardware/accel/bangle_accel_impl.c
 SOURCES        += libs/banglejs/hardware/compass/bangle_compass_impl.c
+SOURCES        += libs/banglejs/hardware/barometer/bangle_barometer_impl.c
 #DEFINES += -DBANGLEJS for some reason BANGLE_1 doesn't use this
 endif
 

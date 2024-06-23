@@ -17,9 +17,11 @@
 #include "bangle_defines.h"
 
 extern volatile JsBangleFlags bangleFlags;
+extern JsBangleTasks bangleTasks;
 extern bool i2cBusy;
 
 extern int backlightTimeout;
 extern volatile uint16_t inactivityTimer; // in ms
 extern int lockTimeout; // in ms
 extern int lcdPowerTimeout; // in ms
+extern volatile uint16_t pollInterval; // in ms

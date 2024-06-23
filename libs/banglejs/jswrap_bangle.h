@@ -20,6 +20,7 @@
 #include "hardware/cpu_hardware/bangle_cpu_hardware_impl.h"
 #include "hardware/accel/jswrap_bangle_accel.h"
 #include "hardware/compass/jswrap_bangle_compass.h"
+#include "hardware/barometer/jswrap_bangle_barometer.h"
 
 void jswrap_banglejs_setLCDTimeout(JsVarFloat timeout);
 void jswrap_banglejs_setLocked(bool isLocked);
@@ -36,8 +37,7 @@ int jswrap_banglejs_isHRMOn();
 bool jswrap_banglejs_setGPSPower(bool isOn, JsVar *appId);
 int jswrap_banglejs_isGPSOn();
 JsVar *jswrap_banglejs_getGPSFix();
-bool jswrap_banglejs_setBarometerPower(bool isOn, JsVar *appId);
-int jswrap_banglejs_isBarometerOn();
+
 
 int jswrap_banglejs_getStepCount();
 void jswrap_banglejs_setStepCount(JsVarInt count);
@@ -47,8 +47,6 @@ JsVar *jswrap_banglejs_getPressure();
 JsVar *jswrap_banglejs_getHealthStatus();
 
 JsVar *jswrap_banglejs_dbg();
-void jswrap_banglejs_barometerWr(JsVarInt reg, JsVarInt data);
-JsVar *jswrap_banglejs_barometerRd(JsVarInt reg, JsVarInt cnt);
 void jswrap_banglejs_hrmWr(JsVarInt reg, JsVarInt data);
 JsVar *jswrap_banglejs_hrmRd(JsVarInt reg, JsVarInt cnt);
 void jswrap_banglejs_ioWr(JsVarInt mask, bool on);

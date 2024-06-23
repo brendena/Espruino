@@ -295,26 +295,6 @@ To get it you need to turn the HRM on with `Bangle.setHRMPower(1)` and also set 
 It is also possible to poke registers with `Bangle.hrmWr` to increase the poll rate if needed. See https://banglejs.com/apps/?id=flashcount for an example of this.
 
  */
-/*TYPESCRIPT
-type PressureData = {
-  temperature: number;
-  pressure: number;
-  altitude: number;
-}
-*/
-/*JSON{
-  "type" : "event",
-  "class" : "Bangle",
-  "name" : "pressure",
-  "params" : [["e","JsVar","An object containing `{temperature,pressure,altitude}`"]],
-  "ifdef" : "BANGLEJS",
-  "typescript" : "on(event: \"pressure\", callback: (e: PressureData) => void): void;"
-}
-When `Bangle.setBarometerPower(true)` is called, this event is fired containing
-barometer readings.
-
-Same format as `Bangle.getPressure()`
-*/
 
 
 /*JSON{
@@ -393,14 +373,6 @@ type SwipeCallback = (directionLR: -1 | 0 | 1, directionUD?: -1 | 0 | 1) => void
 #ifdef BANGLEJS_Q3
 #ifndef EMULATED
 
-
-
-bool pressureBMP280Enabled = false;
-bool pressureSPL06Enabled = false;
-#define PRESSURE_DEVICE_SPL06_007 1 // BMP280 already defined
-#define PRESSURE_DEVICE_BMP280_EN pressureBMP280Enabled
-#define PRESSURE_DEVICE_SPL06_007_EN pressureSPL06Enabled // hardware v2.1 is SPL06_001 - we need this as well
-
 IOEventFlags btn1EventFlags; // for JSBF_BTN_LOW_RESISTANCE_FIX
 #endif // EMULATED
 
@@ -471,50 +443,6 @@ JshI2CInfo i2cInternal;
 #endif
 // =========================================================================
 
-
-
-
-#ifdef PRESSURE_DEVICE
-#ifdef PRESSURE_DEVICE_SPL06_007
-#ifndef PRESSURE_DEVICE_SPL06_007_EN
-#define PRESSURE_DEVICE_SPL06_007_EN 1
-#endif
-#define SPL06_PRSB2 0x00       ///< Pressure/temp data start
-#define SPL06_PRSCFG 0x06      ///< Pressure config
-#define SPL06_TMPCFG 0x07      ///< Temperature config
-#define SPL06_MEASCFG 0x08     ///< Sensor status and config
-#define SPL06_CFGREG 0x09      ///< FIFO config
-#define SPL06_RESET 0x0C       ///< reset
-#define SPL06_COEF_START 0x10  ///< Start of calibration coefficients
-#define SPL06_COEF_NUM 18	     ///< Number of calibration coefficient registers
-#define SPL06_8SAMPLES 3
-/// Calibration coefficients
-short barometer_c0, barometer_c1, barometer_c01, barometer_c11, barometer_c20, barometer_c21, barometer_c30;
-int barometer_c00, barometer_c10;
-#endif
-#ifdef PRESSURE_DEVICE_BMP280
-#ifndef PRESSURE_DEVICE_BMP280_007_EN
-#define PRESSURE_DEVICE_BMP280_007_EN 1
-#endif
-int barometerDT[3]; // temp calibration
-int barometerDP[9]; // pressure calibration
-#endif
-#ifdef PRESSURE_DEVICE_HP203
-#ifndef PRESSURE_DEVICE_HP203_EN
-#define PRESSURE_DEVICE_HP203_EN 1
-#endif
-#endif
-
-/// Promise when pressure is requested
-JsVar *promisePressure; // return promise of getPressure() - when set, the next pressure reading will complete this promise
-volatile uint16_t barometerOnTimer; // how long has the barometer been on?
-double barometerPressure;
-double barometerTemperature;
-double barometerAltitude;
-double barometerSeaLevelPressure = 1013.25; // Standard atmospheric pressure (millibars)
-bool jswrap_banglejs_barometerPoll();
-JsVar *jswrap_banglejs_getBarometerObject();
-#endif // PRESSURE_DEVICE
 
 #ifdef HEARTRATE
 #include "hrm.h"
@@ -1932,124 +1860,7 @@ JsVar *jswrap_banglejs_getGPSFix() {
 
 
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "setBarometerPower",
-    "generate" : "jswrap_banglejs_setBarometerPower",
-    "params" : [
-      ["isOn","bool","True if the barometer IC should be on, false if not"],
-      ["appID","JsVar","A string with the app's name in, used to ensure one app can't turn off something another app is using"]
-    ],
-    "return" : ["bool","Is the Barometer on?"],
-    "#if" : "defined(DTNO1_F5) || defined(BANGLEJS_Q3) || defined(DICKENS)",
-    "typescript" : "setBarometerPower(isOn: ShortBoolean, appID: string): boolean;"
-}
-Set the power to the barometer IC. Once enabled, `Bangle.pressure` events are
-fired each time a new barometer reading is available.
 
-When on, the barometer draws roughly 50uA
-*/
-bool jswrap_banglejs_setBarometerPower(bool isOn, JsVar *appId) {
-#ifdef PRESSURE_DEVICE
-  bool wasOn = bangleFlags & JSBF_BAROMETER_ON;
-  isOn = setDeviceRequested("Barom", appId, isOn);
-  if (!isOn) bangleFlags &= ~JSBF_BAROMETER_ON; // if not on, change flag immediately to stop peripheralPollHandler
-  int tries = 3;
-  while (tries-- > 0) {
-    if (isOn) {
-      if (!wasOn) {
-        barometerOnTimer = 0;
-  #ifdef PRESSURE_DEVICE_SPL06_007_EN
-        if (PRESSURE_DEVICE_SPL06_007_EN) {
-          unsigned char buf[SPL06_COEF_NUM];
-          jswrap_banglejs_barometerWr(SPL06_RESET, 0x89); // Perform soft reset
-          // wait for reset complete (max 100ms) - usually takes 40ms
-          int timeout = 10;
-          do {
-            // we can't poll every ms because initially the top bits are still set in MEAS_CFG
-            jshDelayMicroseconds(10000);
-            buf[0] = SPL06_MEASCFG; jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, false);
-            jsi2cRead(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, true);
-          } while (((buf[0]&0xC0) != 0xC0) && timeout--);
-          // set up the sensor
-          jswrap_banglejs_barometerWr(SPL06_CFGREG, 0); // No FIFO or IRQ (should be default but has been nonzero when read!
-          jswrap_banglejs_barometerWr(SPL06_PRSCFG, 0x33); // pressure oversample by 8x, 8 measurement per second
-          jswrap_banglejs_barometerWr(SPL06_TMPCFG, 0xB3); // temperature oversample by 8x, 8 measurements per second, external sensor
-          jswrap_banglejs_barometerWr(SPL06_MEASCFG, 7); // continuous temperature and pressure measurement
-          // read calibration data
-          buf[0] = SPL06_COEF_START; jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, false);
-          jsi2cRead(PRESSURE_I2C, PRESSURE_ADDR, SPL06_COEF_NUM, buf, true);
-          barometer_c0 = twosComplement(((unsigned short)buf[0] << 4) | (((unsigned short)buf[1] >> 4) & 0x0F), 12);
-          barometer_c1 = twosComplement((((unsigned short)buf[1] & 0x0F) << 8) | buf[2], 12);
-          barometer_c00 = twosComplement(((unsigned int)buf[3] << 12) | ((unsigned int)buf[4] << 4) | (((unsigned int)buf[5] >> 4) & 0x0F), 20);
-          barometer_c10 = twosComplement((((unsigned int)buf[5] & 0x0F) << 16) | ((unsigned int)buf[6] << 8) | (unsigned int)buf[7], 20);
-          barometer_c01 = twosComplement(((unsigned short)buf[8] << 8) | (unsigned short)buf[9], 16);
-          barometer_c11 = twosComplement(((unsigned short)buf[10] << 8) | (unsigned short)buf[11], 16);
-          barometer_c20 = twosComplement(((unsigned short)buf[12] << 8) | (unsigned short)buf[13], 16);
-          barometer_c21 = twosComplement(((unsigned short)buf[14] << 8) | (unsigned short)buf[15], 16);
-          barometer_c30 = twosComplement(((unsigned short)buf[16] << 8) | (unsigned short)buf[17], 16);
-        }
-  #endif // PRESSURE_DEVICE_SPL06_007_EN
-  #ifdef PRESSURE_DEVICE_BMP280_EN
-        if (PRESSURE_DEVICE_BMP280_EN) {
-          jswrap_banglejs_barometerWr(0xF4, 0x27); // ctrl_meas_reg - normal mode, no pressure/temp oversample
-          jswrap_banglejs_barometerWr(0xF5, 0xA0); // config_reg - 1s standby, no filter, I2C
-          // read calibration data
-          unsigned char buf[24];
-          buf[0] = 0x88; jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, false);
-          jsi2cRead(PRESSURE_I2C, PRESSURE_ADDR, 24, buf, true);
-          int i;
-          barometerDT[0] = ((int)buf[1] << 8) | (int)buf[0];  //first coeff is unsigned
-          for (i=1;i<3;i++)
-            barometerDT[i] = twosComplement(((int)buf[(i*2)+1] << 8) | (int)buf[i*2], 16);
-          barometerDP[0] = ((int)buf[7] << 8) | (int)buf[6];  //first coeff is unsigned
-          for (i=1;i<9;i++)
-            barometerDP[i] = twosComplement(((int)buf[(i*2)+7] << 8) | (int)buf[(i*2)+6], 16);
-        }
-  #endif // PRESSURE_DEVICE_BMP280_EN
-      } // wasOn
-    } else { // !isOn -> turn off
-  #ifdef PRESSURE_DEVICE_SPL06_007_EN
-      if (PRESSURE_DEVICE_SPL06_007_EN)
-        jswrap_banglejs_barometerWr(SPL06_MEASCFG, 0); // Barometer off
-  #endif
-  #ifdef PRESSURE_DEVICE_BMP280_EN
-      if (PRESSURE_DEVICE_BMP280_EN)
-        jswrap_banglejs_barometerWr(0xF4, 0); // Barometer off
-  #endif
-    }
-    // ensure we change the flag here so that peripheralPollHandler polls it now
-    if (isOn) bangleFlags |= JSBF_BAROMETER_ON;
-    if (!tries || !jspHasError()) return isOn; // return -  all is going correctly (or we tried a few times and failed)
-    // we had an error (almost certainly I2C) - clear the error and try again hopefully
-    jsvUnLock(jspGetException());
-  }
-  // only turn on
-  if (isOn) bangleFlags |= JSBF_BAROMETER_ON;
-  return isOn;
-#else // PRESSURE_DEVICE
-  return false;
-#endif // PRESSURE_DEVICE
-}
-
-
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "isBarometerOn",
-    "generate" : "jswrap_banglejs_isBarometerOn",
-    "return" : ["bool","Is the Barometer on?"],
-    "#if" : "defined(DTNO1_F5) || defined(BANGLEJS_Q3) || defined(DICKENS)"
-}
-Is the Barometer powered?
-
-Set power with `Bangle.setBarometerPower(...);`
-*/
-// emscripten bug means we can't use 'bool' as return value here!
-int jswrap_banglejs_isBarometerOn() {
-  return (bangleFlags & JSBF_BAROMETER_ON)!=0;
-}
 
 /*JSON{
     "type" : "staticmethod",
@@ -2563,30 +2374,8 @@ NO_INLINE void jswrap_banglejs_init() {
 #endif
   banglejs_accel_init_impl(firstRun);
   if (firstRun) {
-    unsigned char buf[2];
-
 #ifdef PRESSURE_DEVICE
-#ifdef PRESSURE_DEVICE_HP203_EN
-    if (PRESSURE_DEVICE_HP203_EN) {
-      // pressure init
-      buf[0]=0x06;
-      jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, true); // SOFT_RST
-    }
-#endif
-#ifdef PRESSURE_DEVICE_SPL06_007_EN
-    if (PRESSURE_DEVICE_SPL06_007_EN) {
-      // pressure init
-      buf[0]=SPL06_RESET; buf[1]=0x89;
-      jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, true); // SOFT_RST
-    }
-#endif
-#ifdef PRESSURE_DEVICE_BMP280_EN
-    if (PRESSURE_DEVICE_BMP280_EN) {
-      buf[0]=0xE0; buf[1]=0xB6;
-      jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, true); // reset
-    }
-#endif
-    bangleFlags &= ~JSBF_BAROMETER_ON;
+    banglejs_barometer_init_impl();
 #endif // PRESSURE_DEVICE
 
     // Accelerometer variables init
@@ -2821,23 +2610,7 @@ bool jswrap_banglejs_idle() {
       }
     }
   #ifdef PRESSURE_DEVICE
-  if (bangleTasks & JSBT_PRESSURE_DATA) {
-    JsVar *o = jswrap_banglejs_getBarometerObject();
-    if (o) {
-      jsiQueueObjectCallbacks(bangle, JS_EVENT_PREFIX"pressure", &o, 1);
-      if (promisePressure) {
-        // disable sensor now we have a result (if it was on for another reason, "getPressure" as ID ensures it'll still stay on)
-        JsVar *id = jsvNewFromString("getPressure");
-        jswrap_banglejs_setBarometerPower(0, id);
-        jsvUnLock(id);
-        // resolve the promise
-        jspromise_resolve(promisePressure, o);
-        jsvUnLock(promisePressure);
-        promisePressure = 0;
-      }
-      jsvUnLock(o);
-    }
-  }
+    banglejs_barometer_idle_impl(bangle);
   #endif
   #ifdef GPS_PIN_RX
     if (bangleTasks & JSBT_GPS_DATA) {
@@ -3203,50 +2976,6 @@ void jswrap_banglejs_accelWr(JsVarInt reg, JsVarInt data) {
 
 
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "barometerWr",
-    "generate" : "jswrap_banglejs_barometerWr",
-    "params" : [
-      ["reg","int",""],
-      ["data","int",""]
-    ],
-    "#if" : "defined(DTNO1_F5) || defined(BANGLEJS_Q3) || defined(DICKENS)"
-}
-Writes a register on the barometer IC
-*/
-void jswrap_banglejs_barometerWr(JsVarInt reg, JsVarInt data) {
-#ifdef PRESSURE_I2C
-  _jswrap_banglejs_i2cWr(PRESSURE_I2C, PRESSURE_ADDR, reg, data);
-#endif
-}
-
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "barometerRd",
-    "generate" : "jswrap_banglejs_barometerRd",
-    "params" : [
-      ["reg","int",""],
-      ["cnt","int","If specified, returns an array of the given length (max 128). If not (or 0) it returns a number"]
-    ],
-    "return" : ["JsVar",""],
-    "#if" : "defined(DTNO1_F5) || defined(BANGLEJS_Q3) || defined(DICKENS)",
-    "typescript" : [
-      "barometerRd(reg: number, cnt?: 0): number;",
-      "barometerRd(reg: number, cnt: number): number[];"
-    ]
-}
-Reads a register from the barometer IC
-*/
-JsVar *jswrap_banglejs_barometerRd(JsVarInt reg, JsVarInt cnt) {
-#ifdef PRESSURE_I2C
-  return _jswrap_banglejs_i2cRd(PRESSURE_I2C, PRESSURE_ADDR, reg, cnt);
-#else
-  return 0;
-#endif
-}
 
 
 
@@ -3322,211 +3051,6 @@ void jswrap_banglejs_ioWr(JsVarInt mask, bool on) {
 }
 #endif
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "getPressure",
-    "generate" : "jswrap_banglejs_getPressure",
-    "return" : ["JsVar","A promise that will be resolved with `{temperature, pressure, altitude}`"],
-    "#if" : "defined(DTNO1_F5) || defined(BANGLEJS_Q3) || defined(DICKENS)",
-    "typescript" : "getPressure(): Promise<PressureData> | undefined;"
-}
-Read temperature, pressure and altitude data. A promise is returned which will
-be resolved with `{temperature, pressure, altitude}`.
-
-If the Barometer has been turned on with `Bangle.setBarometerPower` then this
-will return with the *next* reading as of 2v21 (or the existing reading on 2v20 or earlier). If the Barometer is off,
-conversions take between 500-750ms.
-
-Altitude assumes a sea-level pressure of 1013.25 hPa
-
-If there's no pressure device (for example, the emulator),
-this returns `undefined`, rather than a Promise.
-
-```
-Bangle.getPressure().then(d=>{
-  console.log(d);
-  // {temperature, pressure, altitude}
-});
-```
-*/
-
-#ifdef PRESSURE_DEVICE
-bool jswrap_banglejs_barometerPoll() {
-  // if the Barometer hadn't been on long enough, don't try and get data
-  int powerOnTimeout = 500;
-#ifdef PRESSURE_DEVICE_BMP280_EN
-  if (PRESSURE_DEVICE_BMP280_EN)
-    powerOnTimeout = 750; // some devices seem to need this long to boot reliably
-#endif
-#ifdef PRESSURE_DEVICE_SPL06_007_EN
-if (PRESSURE_DEVICE_SPL06_007_EN)
-  powerOnTimeout = 400; // on SPL06 we may actually be leaving it *too long* before requesting data, and it starts to do another reading
-#endif
-  if (barometerOnTimer < TIMER_MAX)
-    barometerOnTimer += pollInterval;
-  if (barometerOnTimer < powerOnTimeout)
-    return false;
-  // Otherwise, poll it
-#ifdef PRESSURE_DEVICE_HP203_EN
-  if (PRESSURE_DEVICE_HP203_EN) {
-    unsigned char buf[6];
-    // ADC_CVT - 0b010 01 000  - pressure and temperature channel, OSR = 4096
-    buf[0] = 0x48; jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, true);
-    // wait 100ms
-    jshDelayMicroseconds(100*1000); // we should really have a callback
-    // READ_PT
-    buf[0] = 0x10; jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, false);
-    jsi2cRead(PRESSURE_I2C, PRESSURE_ADDR, 6, buf, true);
-    int temperature = (buf[0]<<16)|(buf[1]<<8)|buf[2];
-    if (temperature&0x800000) temperature-=0x1000000;
-    int pressure = (buf[3]<<16)|(buf[4]<<8)|buf[5];
-    barometerTemperature = temperature/100.0;
-    barometerPressure = pressure/100.0;
-
-    buf[0] = 0x31; jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, false); // READ_A
-    jsi2cRead(PRESSURE_I2C, PRESSURE_ADDR, 3, buf, true);
-    int altitude = (buf[0]<<16)|(buf[1]<<8)|buf[2];
-    if (altitude&0x800000) altitude-=0x1000000;
-    barometerAltitude = altitude/100.0;
-    return true;
-  }
-#endif
-#ifdef PRESSURE_DEVICE_SPL06_007_EN
-  if (PRESSURE_DEVICE_SPL06_007_EN) {
-    static int oversample_scalefactor[] = {524288, 1572864, 3670016, 7864320, 253952, 516096, 1040384, 2088960};
-    unsigned char buf[6];
-
-    // status values
-    buf[0] = SPL06_MEASCFG; jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, false);
-    jsi2cRead(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, true);
-    int status = buf[0];
-    if ((status & 0b00110000) != 0b00110000) {
-      // data hasn't arrived yet
-      return false;
-    }
-
-    // raw values
-    buf[0] = SPL06_PRSB2; jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, false);
-    jsi2cRead(PRESSURE_I2C, PRESSURE_ADDR, 6, buf, true);
-    int praw = (buf[0]<<16)|(buf[1]<<8)|buf[2];
-    praw = twosComplement(praw, 24);
-    int traw = (buf[3]<<16)|(buf[4]<<8)|buf[5];
-    traw = twosComplement(traw, 24);
-
-    double traw_scaled = (double)traw / oversample_scalefactor[SPL06_8SAMPLES]; // temperature oversample by 8x
-    double praw_scaled = (double)praw / oversample_scalefactor[SPL06_8SAMPLES]; // pressure oversample by 8x
-    barometerTemperature = (barometer_c0/2) + (barometer_c1*traw_scaled);
-    double pressurePa = (barometer_c00 + praw_scaled * (barometer_c10 + praw_scaled * (barometer_c20 + praw_scaled * barometer_c30)) +
-                       traw_scaled * barometer_c01 +
-                       traw_scaled * praw_scaled * ( barometer_c11 + praw_scaled * barometer_c21));
-    barometerPressure = pressurePa / 100; // convert Pa to hPa/millibar
-    barometerAltitude = 44330 * (1.0 - jswrap_math_pow(barometerPressure / barometerSeaLevelPressure, 0.1903));
-    // TODO: temperature corrected altitude?
-    return true;
-  }
-#endif // PRESSURE_DEVICE_SPL06_007_EN
-#ifdef PRESSURE_DEVICE_BMP280_EN
-  if (PRESSURE_DEVICE_BMP280_EN) {
-    unsigned char buf[8];
-    buf[0] = 0xF7; jsi2cWrite(PRESSURE_I2C, PRESSURE_ADDR, 1, buf, false); // READ_A
-    jsi2cRead(PRESSURE_I2C, PRESSURE_ADDR, 6, buf, true);
-    int uncomp_pres = (buf[0] << 12) | (buf[1] << 4) | (buf[2] >> 4);
-    int uncomp_temp = (buf[3] << 12) | (buf[4] << 4) | (buf[5] >> 4);
-    double var1, var2;
-    // temperature
-    var1 = (((double) uncomp_temp) / 16384.0 - ((double) barometerDT[0]) / 1024.0) *
-           ((double) barometerDT[1]);
-    var2 =
-        ((((double) uncomp_temp) / 131072.0 - ((double) barometerDT[0]) / 8192.0) *
-         (((double) uncomp_temp) / 131072.0 - ((double) barometerDT[0]) / 8192.0)) *
-        ((double) barometerDT[2]);
-    int32_t t_fine = (int32_t) (var1 + var2);
-    barometerTemperature = ((var1 + var2) / 5120.0);
-    // pressure
-    var1 = ((double) t_fine / 2.0) - 64000.0;
-    var2 = var1 * var1 * ((double) barometerDP[5]) / 32768.0;
-    var2 = var2 + var1 * ((double) barometerDP[4]) * 2.0;
-    var2 = (var2 / 4.0) + (((double) barometerDP[3]) * 65536.0);
-    var1 = (((double)barometerDP[2]) * var1 * var1 / 524288.0 + ((double)barometerDP[1]) * var1) /
-          524288.0;
-    var1 = (1.0 + var1 / 32768.0) * ((double) barometerDP[0]);
-
-    barometerPressure = 1048576.0 - (double)uncomp_pres;
-    if (var1 < 0 || var1 > 0) {
-      barometerPressure = (barometerPressure - (var2 / 4096.0)) * 6250.0 / var1;
-      var1 = ((double)barometerDP[8]) * (barometerPressure) * (barometerPressure) / 2147483648.0;
-      var2 = (barometerPressure) * ((double)barometerDP[7]) / 32768.0;
-      barometerPressure = barometerPressure + (var1 + var2 + ((double)barometerDP[6])) / 16.0;
-      barometerPressure = barometerPressure/100.0;
-    } else {
-      barometerPressure = 0;
-    }
-
-    barometerAltitude = 44330 * (1.0 - jswrap_math_pow(barometerPressure / barometerSeaLevelPressure, 0.1903));
-    // TODO: temperature corrected altitude?
-    return true;
-  }
-#endif //PRESSURE_DEVICE_BMP280_EN
-  return false;
-}
-
-JsVar *jswrap_banglejs_getBarometerObject() {
-  JsVar *o = jsvNewObject();
-  if (o) {
-    jsvObjectSetChildAndUnLock(o,"temperature", jsvNewFromFloat(barometerTemperature));
-    jsvObjectSetChildAndUnLock(o,"pressure", jsvNewFromFloat(barometerPressure));
-    jsvObjectSetChildAndUnLock(o,"altitude", jsvNewFromFloat(barometerAltitude));
-//    jsvObjectSetChildAndUnLock(o,"SPL06", jsvNewFromBool(pressureSPL06Enabled));
-//    jsvObjectSetChildAndUnLock(o,"BMP280", jsvNewFromBool(pressureBMP280Enabled));
-  }
-  return o;
-}
-#endif // PRESSURE_DEVICE
-
-
-JsVar *jswrap_banglejs_getPressure() {
-#ifdef PRESSURE_DEVICE
-  if (promisePressure) {
-    jsExceptionHere(JSET_ERROR, "Conversion in progress");
-    return 0;
-  }
-  promisePressure = jspromise_create();
-  if (!promisePressure) return 0;
-  // If barometer is already on, our promise is enough. jswrap_banglejs_idle (after peripheralPollHandler)
-  // will see promisePressure and will resolve it when new data is available
-  if (bangleFlags & JSBF_BAROMETER_ON)
-    return jsvLockAgain(promisePressure);
-  // Turning barometer on, will turn off in jswrap_banglejs_idle (after peripheralPollHandler)
-  JsVar *id = jsvNewFromString("getPressure");
-  jswrap_banglejs_setBarometerPower(1, id);
-  jsvUnLock(id);
-  /* Occasionally on some devices (https://github.com/espruino/Espruino/issues/2137)
-  you can get an I2C error. This stops the error from being fired when getPressure
-  is called and instead rejects the promise. */
-  JsVar *exception = jspGetException();
-  if (exception) {
-    jspromise_reject(promisePressure, exception);
-    jsvUnLock2(promisePressure, exception);
-    JsVar *r = promisePressure;
-    promisePressure = 0;
-    return r;
-  }
-
-  bool hadError = jspHasError();
-  if (hadError) {
-    JsVar *msg = jsvNewFromString("I2C barometer error");
-    JsVar *exception = jswrap_internalerror_constructor(msg);
-    jspromise_reject(promisePressure, exception);
-    jsvUnLock3(promisePressure, exception, msg);
-    JsVar *r = promisePressure;
-    promisePressure = 0;
-    return r;
-  }
-  return jsvLockAgain(promisePressure);
-#endif
-  return NULL;
-}
 
 /*JSON{
     "type" : "staticmethod",
@@ -3705,14 +3229,7 @@ static void jswrap_banglejs_periph_off() {
   banglejs_accel_off_impl();
   banglejs_compass_off_impl();
 #ifdef PRESSURE_DEVICE
-#ifdef PRESSURE_DEVICE_SPL06_007_EN
-  if (PRESSURE_DEVICE_SPL06_007_EN)
-    jswrap_banglejs_barometerWr(SPL06_MEASCFG, 0); // Barometer off
-#endif
-#ifdef PRESSURE_DEVICE_BMP280_EN
-  if (PRESSURE_DEVICE_BMP280_EN)
-    jswrap_banglejs_barometerWr(0xF4, 0); // Barometer off
-#endif
+  banglejs_barometer_off_impl();
 #endif // PRESSURE_DEVICE
 
 
