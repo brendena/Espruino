@@ -31,3 +31,7 @@
 #ifndef WAKE_FROM_OFF_TIME
     #define WAKE_FROM_OFF_TIME 200
 #endif
+
+#ifndef MAG_MAX_RANGE
+    #define MAG_MAX_RANGE 500 // maximum range of readings allowed between magmin/magmax. In the UK at ~20uT 250 is ok, and the max field strength us ~40uT
+#endif

@@ -123,33 +123,6 @@ type ShortBoolean = boolean | 0 | 1;
 The Bangle.js's vibration motor.
 */
 
-/*TYPESCRIPT
-type AccelData = {
-  x: number;
-  y: number;
-  z: number;
-  diff: number;
-  mag: number;
-};
-*/
-/*JSON{
-  "type" : "event",
-  "class" : "Bangle",
-  "name" : "accel",
-  "params" : [["xyz","JsVar",""]],
-  "ifdef" : "BANGLEJS",
-  "typescript": "on(event: \"accel\", callback: (xyz: AccelData) => void): void;"
-}
-Accelerometer data available with `{x,y,z,diff,mag}` object as a parameter.
-
-* `x` is X axis (left-right) in `g`
-* `y` is Y axis (up-down) in `g`
-* `z` is Z axis (in-out) in `g`
-* `diff` is difference between this and the last reading in `g`
-* `mag` is the magnitude of the acceleration in `g`
-
-You can also retrieve the most recent reading with `Bangle.getAccel()`.
- */
 /*JSON{
   "type" : "event",
   "class" : "Bangle",
@@ -207,41 +180,7 @@ To tweak when this happens, see the `twist*` options in `Bangle.setOptions()`
 }
 Is the battery charging or not?
  */
-/*TYPESCRIPT
-type CompassData = {
-  x: number;
-  y: number;
-  z: number;
-  dx: number;
-  dy: number;
-  dz: number;
-  heading: number;
-};
-*/
-/*JSON{
-  "type" : "event",
-  "class" : "Bangle",
-  "name" : "mag",
-  "params" : [["xyz","JsVar",""]],
-  "ifdef" : "BANGLEJS",
-  "typescript" : "on(event: \"mag\", callback: (xyz: CompassData) => void): void;"
-}
-Magnetometer/Compass data available with `{x,y,z,dx,dy,dz,heading}` object as a
-parameter
 
-* `x/y/z` raw x,y,z magnetometer readings
-* `dx/dy/dz` readings based on calibration since magnetometer turned on
-* `heading` in degrees based on calibrated readings (will be NaN if magnetometer
-  hasn't been rotated around 360 degrees).
-
-**Note:** In 2v15 firmware and earlier the heading is inverted (360-heading). There's
-a fix in the bootloader which will apply a fix for those headings, but old apps may
-still expect an inverted value.
-
-To get this event you must turn the compass on with `Bangle.setCompassPower(1)`.
-
-You can also retrieve the most recent reading with `Bangle.getCompass()`.
- */
 /*JSON{
   "type" : "event",
   "class" : "Bangle",
@@ -669,24 +608,8 @@ char lcdWakeButton;
 JsSysTime lcdWakeButtonTime;
 
 
-#ifdef MAG_I2C
-// compass data
-Vector3 mag, magmin, magmax;
-bool magOnWhenCharging;
-#define MAG_CHARGE_TIMEOUT 3000 // time after charging when magnetometer value gets automatically reset
-#ifndef MAG_MAX_RANGE
-#define MAG_MAX_RANGE 500 // maximum range of readings allowed between magmin/magmax. In the UK at ~20uT 250 is ok, and the max field strength us ~40uT
-#endif
-#endif // MAG_I2C
-#ifdef MAG_DEVICE_GMC303
-uint8_t magCalib[3]; // Magnetic Coefficient Registers - used to rescale the magnetometer values
-#endif
-/// accelerometer data. 8192 = 1G
-Vector3 acc;
-/// squared accelerometer magnitude
-int accMagSquared;
-/// magnitude of difference in accelerometer vectors since last reading
-unsigned int accDiff;
+
+
 
 /// History of accelerometer readings
 int8_t accHistory[ACCEL_HISTORY_LEN*3];
@@ -1006,8 +929,9 @@ void peripheralPollHandler() {
     jshHadEvent();
   }
   if (i2cBusy) return;
+
+  
   i2cBusy = true;
-  unsigned char buf[7];
 #ifdef MAG_I2C
   // check the magnetometer if we had it on
   if (bangleFlags & JSBF_COMPASS_ON) {
@@ -1020,52 +944,8 @@ void peripheralPollHandler() {
       magOnWhenCharging = false;
     }
 
-    bool newReading = false;
-#ifdef MAG_DEVICE_GMC303
-    buf[0]=0x10;
-    jsi2cWrite(MAG_I2C, MAG_ADDR, 1, buf, false);
-    jsi2cRead(MAG_I2C, MAG_ADDR, 7, buf, true);
-    if (buf[0]&1) { // then we have data
-      int16_t magRaw[3];
-      magRaw[0] = buf[1] | (buf[2]<<8);
-      magRaw[1] = buf[3] | (buf[4]<<8);
-      magRaw[2] = buf[5] | (buf[6]<<8);
-      // no sign extend because magRaw is 16 bit signed already
-      // apply calibration (and we multiply by 4 to bring the values more in line with what we get for Bangle.js's magnetometer)
-      mag.y = (magRaw[0] * (128+magCalib[0])) >> 5; // x/y are swapped
-      mag.x = (magRaw[1] * (128+magCalib[1])) >> 5;
-      mag.z = (magRaw[2] * (128+magCalib[2])) >> 5;
-#ifdef LCD_ROTATION
-  #if LCD_ROTATION == 180
-      mag.y = -mag.y;
-      mag.x = -mag.x;
-  #elif LCD_ROTATION == 0
-      // all ok
-  #else
-    #error "LCD rotation is only implemented for 180 and 0 degrees"
-  #endif
-#endif
-      newReading = true;
-    }
-#endif
-#ifdef MAG_DEVICE_UNKNOWN_0C
-    buf[0]=0x4E;
-    jsi2cWrite(MAG_I2C, MAG_ADDR, 1, buf, false);
-    jsi2cRead(MAG_I2C, MAG_ADDR, 7, buf, true);
-    if (!(buf[0]&16)) { // then we have data that wasn't read before
-      // &2 seems always set
-      // &16 seems set if we read twice
-      // &32 might be reading in progress
-      mag.y = buf[2] | (buf[1]<<8);
-      mag.x = buf[4] | (buf[3]<<8);
-      mag.z = buf[6] | (buf[5]<<8);
-      // Now read 0x3E which should kick off a new reading
-      buf[0]=0x3E;
-      jsi2cWrite(MAG_I2C, MAG_ADDR, 1, buf, false);
-      jsi2cRead(MAG_I2C, MAG_ADDR, 1, buf, true);
-      newReading = true;
-    }
-#endif
+    bool newReading = banglejs_compass_get_pos_impl(&mag);
+
     if (newReading) {
       // if the graphics instance is rotated, also rotate magnetometer values
       if (graphicsInternal.data.flags & JSGRAPHICSFLAGS_SWAP_XY) {
@@ -1196,12 +1076,8 @@ void peripheralPollHandler() {
         if (powerSaveTimer >= POWER_SAVE_TIMEOUT && // stationary for POWER_SAVE_TIMEOUT
             pollInterval == DEFAULT_ACCEL_POLL_INTERVAL && // we are in high power mode
             !(bangleFlags & JSBF_ACCEL_LISTENER) && // nothing was listening to accelerometer data
-#ifdef PRESSURE_DEVICE
             !(bangleFlags & JSBF_BAROMETER_ON) && // barometer isn't on (streaming uses peripheralPollHandler)
-#endif
-#ifdef MAG_I2C
             !(bangleFlags & JSBF_COMPASS_ON) && // compass isn't on (streaming uses peripheralPollHandler)
-#endif
             true) {
           bangleTasks |= JSBT_ACCEL_INTERVAL_POWERSAVE;
           jshHadEvent();
@@ -2052,105 +1928,9 @@ JsVar *jswrap_banglejs_getGPSFix() {
 #endif
 }
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "setCompassPower",
-    "generate" : "jswrap_banglejs_setCompassPower",
-    "params" : [
-      ["isOn","bool","True if the Compass should be on, false if not"],
-      ["appID","JsVar","A string with the app's name in, used to ensure one app can't turn off something another app is using"]
-    ],
-    "return" : ["bool","Is the Compass on?"],
-    "ifdef" : "BANGLEJS",
-    "typescript" : "setCompassPower(isOn: ShortBoolean, appID: string): boolean;"
-}
-Set the power to the Compass
 
-When on, data is output via the `mag` event on `Bangle`:
 
-```
-Bangle.setCompassPower(true, "myapp");
-Bangle.on('mag',print);
-```
 
-*When on, the compass draws roughly 2mA*
-*/
-bool jswrap_banglejs_setCompassPower(bool isOn, JsVar *appId) {
-#ifdef MAG_I2C
-  bool wasOn = bangleFlags & JSBF_COMPASS_ON;
-  isOn = setDeviceRequested("Compass", appId, isOn);
-  //jsiConsolePrintf("setCompassPower %d %d\n",wasOn,isOn);
-
-  if (isOn) bangleFlags |= JSBF_COMPASS_ON;
-  else bangleFlags &= ~JSBF_COMPASS_ON;
-
-  if (isOn) {
-    if (!wasOn) { // If it wasn't on before, reset
-#ifdef MAG_DEVICE_GMC303
-      jswrap_banglejs_compassWr(0x31,4); // continuous measurement mode, 20Hz
-      // Get magnetometer calibration values
-      magCalib[0] = 0x60;
-      jsi2cWrite(MAG_I2C, MAG_ADDR, 1, magCalib, false);
-      jsi2cRead(MAG_I2C, MAG_ADDR, 3, magCalib, true);
-#endif
-#ifdef MAG_DEVICE_UNKNOWN_0C
-      // Read 0x3E to enable compass readings
-      jsvUnLock(jswrap_banglejs_compassRd(0x3E,0));
-#endif
-    }
-  } else { // !isOn -> turn off
-#ifdef MAG_DEVICE_GMC303
-    jswrap_banglejs_compassWr(0x31,0); // off
-#endif
-  }
-  return isOn;
-#else
-  return false;
-#endif
-}
-
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "isCompassOn",
-    "generate" : "jswrap_banglejs_isCompassOn",
-    "return" : ["bool","Is the Compass on?"],
-    "ifdef" : "BANGLEJS"
-}
-Is the compass powered?
-
-Set power with `Bangle.setCompassPower(...);`
-*/
-// emscripten bug means we can't use 'bool' as return value here!
-int jswrap_banglejs_isCompassOn() {
-  return (bangleFlags & JSBF_COMPASS_ON)!=0;
-}
-
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "resetCompass",
-    "generate" : "jswrap_banglejs_resetCompass",
-    "params" : [],
-    "ifdef" : "BANGLEJS"
-}
-Resets the compass minimum/maximum values. Can be used if the compass isn't
-providing a reliable heading any more.
-*/
-void jswrap_banglejs_resetCompass() {
-#ifdef MAG_I2C
-  mag.x = 0;
-  mag.y = 0;
-  mag.z = 0;
-  magmin.x = 32767;
-  magmin.y = 32767;
-  magmin.z = 32767;
-  magmax.x = -32768;
-  magmax.y = -32768;
-  magmax.z = -32768;
-#endif
-}
 
 /*JSON{
     "type" : "staticmethod",
@@ -2301,91 +2081,9 @@ void jswrap_banglejs_setStepCount(JsVarInt count) {
   stepCounter = count;
 }
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "getCompass",
-    "generate" : "jswrap_banglejs_getCompass",
-    "return" : ["JsVar","An object containing magnetometer readings (as below)"],
-    "ifdef" : "BANGLEJS",
-    "typescript" : "getCompass(): CompassData;"
-}
-Get the most recent Magnetometer/Compass reading. Data is in the same format as
-the `Bangle.on('mag',` event.
 
-Returns an `{x,y,z,dx,dy,dz,heading}` object
 
-* `x/y/z` raw x,y,z magnetometer readings
-* `dx/dy/dz` readings based on calibration since magnetometer turned on
-* `heading` in degrees based on calibrated readings (will be NaN if magnetometer
-  hasn't been rotated around 360 degrees).
 
-**Note:** In 2v15 firmware and earlier the heading is inverted (360-heading). There's
-a fix in the bootloader which will apply a fix for those headings, but old apps may
-still expect an inverted value.
-
-To get this event you must turn the compass on with `Bangle.setCompassPower(1)`.*/
-JsVar *jswrap_banglejs_getCompass() {
-#ifdef MAG_I2C
-  JsVar *o = jsvNewObject();
-  if (o) {
-    jsvObjectSetChildAndUnLock(o, "x", jsvNewFromInteger(mag.x));
-    jsvObjectSetChildAndUnLock(o, "y", jsvNewFromInteger(mag.y));
-    jsvObjectSetChildAndUnLock(o, "z", jsvNewFromInteger(mag.z));
-    int dx = mag.x - ((magmin.x+magmax.x)/2);
-    int dy = mag.y - ((magmin.y+magmax.y)/2);
-    int dz = mag.z - ((magmin.z+magmax.z)/2);
-    jsvObjectSetChildAndUnLock(o, "dx", jsvNewFromInteger(dx));
-    jsvObjectSetChildAndUnLock(o, "dy", jsvNewFromInteger(dy));
-    jsvObjectSetChildAndUnLock(o, "dz", jsvNewFromInteger(dz));
-    int cx = magmax.x-magmin.x;
-    int cy = magmax.y-magmin.y;
-    int c = cx*cx+cy*cy;
-    double h = NAN;
-    if (c>3000) { // only give a heading if we think we have valid data (eg enough magnetic field difference in min/max
-      h = jswrap_math_atan2(dx,dy)*180/PI;
-      if (h<0) h+=360;
-      h = 360-h; // ensure heading matches with what we'd expect from a compass
-    }
-    jsvObjectSetChildAndUnLock(o, "heading", jsvNewFromFloat(h));
-  }
-  return o;
-#else
-  return 0;
-#endif
-}
-
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "getAccel",
-    "generate" : "jswrap_banglejs_getAccel",
-    "return" : ["JsVar","An object containing accelerometer readings (as below)"],
-    "ifdef" : "BANGLEJS",
-    "typescript" : "getAccel(): AccelData & { td: number };"
-}
-Get the most recent accelerometer reading. Data is in the same format as the
-`Bangle.on('accel',` event.
-
-* `x` is X axis (left-right) in `g`
-* `y` is Y axis (up-down) in `g`
-* `z` is Z axis (in-out) in `g`
-* `diff` is difference between this and the last reading in `g` (calculated by
-  comparing vectors, not magnitudes)
-* `td` is the elapsed
-* `mag` is the magnitude of the acceleration in `g`
-*/
-JsVar *jswrap_banglejs_getAccel() {
-  JsVar *o = jsvNewObject();
-  if (o) {
-    jsvObjectSetChildAndUnLock(o, "x", jsvNewFromFloat(acc.x/8192.0));
-    jsvObjectSetChildAndUnLock(o, "y", jsvNewFromFloat(acc.y/8192.0));
-    jsvObjectSetChildAndUnLock(o, "z", jsvNewFromFloat(acc.z/8192.0));
-    jsvObjectSetChildAndUnLock(o, "mag", jsvNewFromFloat(sqrt(accMagSquared)/8192.0));
-    jsvObjectSetChildAndUnLock(o, "diff", jsvNewFromFloat(accDiff/8192.0));
-  }
-  return o;
-}
 
 /*JSON{
     "type" : "staticmethod",
@@ -2894,16 +2592,10 @@ NO_INLINE void jswrap_banglejs_init() {
     // Accelerometer variables init
     stepcount_init();
     stepCounter = 0;
-#ifdef MAG_I2C
-#ifdef MAG_DEVICE_GMC303
-    // compass init
-    jswrap_banglejs_compassWr(0x32,1); // soft reset
-    jswrap_banglejs_compassWr(0x31,0); // power down mode
-#endif
-    bangleFlags &= ~JSBF_COMPASS_ON;
-    // ensure compass readings are reset to power-on state
-    jswrap_banglejs_resetCompass();
-#endif
+
+
+    banglejs_compass_init_impl();
+
     // Touchscreen gesture detection
 #if ESPR_BANGLE_UNISTROKE
     unistroke_init();
@@ -3557,50 +3249,7 @@ JsVar *jswrap_banglejs_barometerRd(JsVarInt reg, JsVarInt cnt) {
 }
 
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "compassWr",
-    "generate" : "jswrap_banglejs_compassWr",
-    "params" : [
-      ["reg","int",""],
-      ["data","int",""]
-    ],
-    "ifdef" : "BANGLEJS"
-}
-Writes a register on the Magnetometer/Compass
-*/
-void jswrap_banglejs_compassWr(JsVarInt reg, JsVarInt data) {
-#ifdef MAG_I2C
-  _jswrap_banglejs_i2cWr(MAG_I2C, MAG_ADDR, reg, data);
-#endif
-}
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "compassRd",
-    "generate" : "jswrap_banglejs_compassRd",
-    "params" : [
-      ["reg","int",""],
-      ["cnt","int","If specified, returns an array of the given length (max 128). If not (or 0) it returns a number"]
-    ],
-    "return" : ["JsVar",""],
-    "ifdef" : "BANGLEJS",
-    "typescript" : [
-      "compassRd(reg: number, cnt?: 0): number;",
-      "compassRd(reg: number, cnt: number): number[];"
-    ]
-}
-Read a register on the Magnetometer/Compass
-*/
-JsVar *jswrap_banglejs_compassRd(JsVarInt reg, JsVarInt cnt) {
-#ifdef MAG_I2C
-  return _jswrap_banglejs_i2cRd(MAG_I2C, MAG_ADDR, reg, cnt);
-#else
-  return 0;
-#endif
-}
 
 /*JSON{
     "type" : "staticmethod",
@@ -4054,10 +3703,7 @@ static void jswrap_banglejs_periph_off() {
   banglejs_pwrBacklight_impl(0);
 
   banglejs_accel_off_impl();
-
-#ifdef MAG_DEVICE_GMC303
-  jswrap_banglejs_compassWr(0x31,0); // compass off
-#endif
+  banglejs_compass_off_impl();
 #ifdef PRESSURE_DEVICE
 #ifdef PRESSURE_DEVICE_SPL06_007_EN
   if (PRESSURE_DEVICE_SPL06_007_EN)

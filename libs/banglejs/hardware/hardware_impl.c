@@ -14,6 +14,10 @@
 #include "accel/bangle_accel_KXTJ3_1057_impl.c"
 #include "accel/bangle_accel_KX126_impl.c"
 
+//compass   
+#include "compass/bangle_compase_UNKOWN_0C_impl.c"
+#include "compass/bangle_compass_GMC303_impl.c"
+
 #ifdef BANGLEJS_Q3
     #include "hardware/devices/device_bangle.c"
 #endif
