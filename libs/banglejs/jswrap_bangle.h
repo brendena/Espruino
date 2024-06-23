@@ -17,6 +17,8 @@
 #include "hardware/backlight/jswrap_bangle_backlight.h"
 #include "hardware/display/jswrap_bangle_display.h"
 #include "hardware/touch/jswrap_bangle_touch.h"
+#include "hardware/cpu_hardware/bangle_cpu_hardware_impl.h"
+#include "hardware/accel/jswrap_bangle_accel.h"
 
 void jswrap_banglejs_setLCDTimeout(JsVarFloat timeout);
 void jswrap_banglejs_setLocked(bool isLocked);
@@ -48,8 +50,6 @@ JsVar *jswrap_banglejs_getPressure();
 JsVar *jswrap_banglejs_getHealthStatus();
 
 JsVar *jswrap_banglejs_dbg();
-void jswrap_banglejs_accelWr(JsVarInt reg, JsVarInt data);
-JsVar *jswrap_banglejs_accelRd(JsVarInt reg, JsVarInt cnt);
 void jswrap_banglejs_barometerWr(JsVarInt reg, JsVarInt data);
 JsVar *jswrap_banglejs_barometerRd(JsVarInt reg, JsVarInt cnt);
 void jswrap_banglejs_compassWr(JsVarInt reg, JsVarInt data);

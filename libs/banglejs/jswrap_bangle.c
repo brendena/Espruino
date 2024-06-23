@@ -476,16 +476,8 @@ type SwipeCallback = (directionLR: -1 | 0 | 1, directionUD?: -1 | 0 | 1) => void
 
 #ifdef BANGLEJS_Q3
 #ifndef EMULATED
-JshI2CInfo i2cAccel;
-JshI2CInfo i2cMag;
-JshI2CInfo i2cPressure;
-JshI2CInfo i2cHRM;
-#define ACCEL_I2C &i2cAccel
-#define MAG_I2C &i2cMag
-#define PRESSURE_I2C &i2cPressure
-#define HRM_I2C &i2cHRM
-#define GPS_UART EV_SERIAL1
-#define HEARTRATE 1
+
+
 
 bool pressureBMP280Enabled = false;
 bool pressureSPL06Enabled = false;
@@ -2956,40 +2948,10 @@ NO_INLINE void jswrap_banglejs_init() {
   graphicsStructResetState(&graphicsInternal);
   // no need to unlock graphics as we stored it in 'graphicsVar'
 #endif
-
+  banglejs_accel_init_impl(firstRun);
   if (firstRun) {
     unsigned char buf[2];
-#ifdef ACCEL_DEVICE_KX023
-    // KX023-1025 accelerometer init
-    jswrap_banglejs_accelWr(0x18,0x0a); // CNTL1 Off (top bit)
-    jswrap_banglejs_accelWr(0x19,0x80); // CNTL2 Software reset
-    buf[0] = 0x19; buf[1] = 0x80; // Second I2C address for software reset (issue #1972)
-    jsi2cWrite(ACCEL_I2C, ACCEL_ADDR-2, 2, buf, true);
-    jshDelayMicroseconds(2000);
-    jswrap_banglejs_accelWr(0x1a,0b10011000); // CNTL3 12.5Hz tilt, 400Hz tap, 0.781Hz motion detection
-    //jswrap_banglejs_accelWr(0x1b,0b00000001); // ODCNTL - 25Hz acceleration output data rate, filtering low-pass ODR/9
-    jswrap_banglejs_accelWr(0x1b,0b00000000); // ODCNTL - 12.5Hz acceleration output data rate, filtering low-pass ODR/9
-
-    jswrap_banglejs_accelWr(0x1c,0); // INC1 disabled
-    jswrap_banglejs_accelWr(0x1d,0); // INC2 disabled
-    jswrap_banglejs_accelWr(0x1e,0x3F); // INC3 enable tap detect in all 6 directions
-    jswrap_banglejs_accelWr(0x1f,0); // INC4 disabled
-    jswrap_banglejs_accelWr(0x20,0); // INC5 disabled
-    jswrap_banglejs_accelWr(0x21,0); // INC6 disabled
-    jswrap_banglejs_accelWr(0x23,3); // WUFC wakeupi detect counter
-    jswrap_banglejs_accelWr(0x24,3); // TDTRC Tap detect enable
-    jswrap_banglejs_accelWr(0x25, 0x78); // TDTC Tap detect double tap (0x78 default)
-    jswrap_banglejs_accelWr(0x26, 0xCB); // TTH Tap detect threshold high (0xCB default)
-    jswrap_banglejs_accelWr(0x27, 0x25); // TTL Tap detect threshold low (0x1A default)
-    // setting TTL=0x1A means that when the HRM is on, interference sometimes means a spurious tap is detected! https://forum.espruino.com/conversations/390041
-    jswrap_banglejs_accelWr(0x30,1); // ATH low wakeup detect threshold
-    //jswrap_banglejs_accelWr(0x35,0 << 4); // LP_CNTL no averaging of samples
-    jswrap_banglejs_accelWr(0x35,2 << 4); // LP_CNTL 4x averaging of samples
-    jswrap_banglejs_accelWr(0x3e,0); // clear the buffer
-    jswrap_banglejs_accelWr(0x18,0b00101100);  // CNTL1 Off, low power, DRDYE=1, 4g range, TDTE (tap enable)=1, Wakeup=0, Tilt=0
-    jswrap_banglejs_accelWr(0x18,0b10101100);  // CNTL1 On, low power, DRDYE=1, 4g range, TDTE (tap enable)=1, Wakeup=0, Tilt=0
-    // high power vs low power uses an extra 150uA
-#endif
+  
 #ifdef ACCEL_DEVICE_KXTJ3_1057
     // KXTJ3-1057 accelerometer init
     jswrap_banglejs_accelWr(0x1B,0b00101000); // CNTL1 Off (top bit)
@@ -3643,33 +3605,7 @@ JsVar *jswrap_banglejs_dbg() {
   return o;
 }
 
-#ifndef EMULATED
-void _jswrap_banglejs_i2cWr(JshI2CInfo *i2c, int i2cAddr, JsVarInt reg, JsVarInt data) {
-  unsigned char buf[2];
-  buf[0] = (unsigned char)reg;
-  buf[1] = (unsigned char)data;
-  i2cBusy = true;
-  jsi2cWrite(i2c, i2cAddr, 2, buf, true);
-  i2cBusy = false;
-}
 
-JsVar *_jswrap_banglejs_i2cRd(JshI2CInfo *i2c, int i2cAddr, JsVarInt reg, JsVarInt cnt) {
-  if (cnt<0) cnt=0;
-  unsigned char buf[128];
-  if (cnt>(int)sizeof(buf)) cnt=sizeof(buf);
-  buf[0] = (unsigned char)reg;
-  i2cBusy = true;
-  jsi2cWrite(i2c, i2cAddr, 1, buf, false);
-  jsi2cRead(i2c, i2cAddr, (cnt==0)?1:cnt, buf, true);
-  i2cBusy = false;
-  if (cnt) {
-    JsVar *ab = jsvNewArrayBufferWithData(cnt, buf);
-    JsVar *d = jswrap_typedarray_constructor(ARRAYBUFFERVIEW_UINT8, ab,0,0);
-    jsvUnLock(ab);
-    return d;
-  } else return jsvNewFromInteger(buf[0]);
-}
-#endif
 
 /*JSON{
     "type" : "staticmethod",
@@ -3690,36 +3626,6 @@ void jswrap_banglejs_accelWr(JsVarInt reg, JsVarInt data) {
 #endif
 }
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "accelRd",
-    "generate" : "jswrap_banglejs_accelRd",
-    "params" : [
-      ["reg","int",""],
-      ["cnt","int","If specified, returns an array of the given length (max 128). If not (or 0) it returns a number"]
-    ],
-    "return" : ["JsVar",""],
-    "ifdef" : "BANGLEJS",
-    "typescript" : [
-      "accelRd(reg: number, cnt?: 0): number;",
-      "accelRd(reg: number, cnt: number): number[];"
-    ]
-}
-Reads a register from the accelerometer
-
-**Note:** On Espruino 2v06 and before this function only returns a number (`cnt`
-is ignored).
-*/
-
-
-JsVar *jswrap_banglejs_accelRd(JsVarInt reg, JsVarInt cnt) {
-#ifdef ACCEL_I2C
-  return _jswrap_banglejs_i2cRd(ACCEL_I2C, ACCEL_ADDR, reg, cnt);
-#else
-  return 0;
-#endif
-}
 
 
 /*JSON{
@@ -4263,9 +4169,9 @@ static void jswrap_banglejs_periph_off() {
   _jswrap_banglejs_setLocked(1,NULL); // disable touchscreen if we have one
   banglejs_setLCDPowerController_impl(0);
   banglejs_pwrBacklight_impl(0);
-#ifdef ACCEL_DEVICE_KX023
-  jswrap_banglejs_accelWr(0x18,0x0a); // accelerometer off
-#endif
+
+  banglejs_accel_off_impl();
+
 #ifdef ACCEL_DEVICE_KXTJ3_1057
   jswrap_banglejs_accelWr(0x1B,0); // accelerometer off
 #endif

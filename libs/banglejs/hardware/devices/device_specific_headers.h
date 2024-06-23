@@ -1,5 +1,7 @@
-#include "device_bangle2.h"
-
+#include "jshardware.h"
+#ifdef BANGLEJS_Q3
+    #include "device_bangle2.h"
+#endif
 
 #define DEFAULT_ACCEL_POLL_INTERVAL 80 // in msec - 12.5 hz to match accelerometer
 #define POWER_SAVE_ACCEL_POLL_INTERVAL 800 // in msec

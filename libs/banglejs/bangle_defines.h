@@ -18,6 +18,9 @@
 #include "stdio.h"
 #include "stdint.h"
 #include "stdbool.h"
+#include "jstypes.h"
+#include "jshardware.h"
+#include "jswrap_arraybuffer.h"
 #ifndef EMULATED
   #include "app_timer.h"
 #endif
@@ -137,6 +140,19 @@ typedef enum {
 } TouchGestureType;
 
 
+typedef enum {
+  ESPR_CMD_I2C_WRITE = 1,
+  ESPR_CMD_I2C_MULTI_BYTES,
+  ESPR_CMD_I2C_SLEEP,
+} ESPR_CMD_I2C_TYPES;
+
+typedef struct ESPR_CMD_I2C{
+  ESPR_CMD_I2C_TYPES type;
+  uint8_t reg;
+  uint32_t data;
+}ESPR_cmd_i2c;
+
+#define SIZE_OF_CMD_I2C(arr) (sizeof(arr)/sizeof(ESPR_CMD_I2C))
 
 
 #define ESPR_WEAK __attribute__((weak))
