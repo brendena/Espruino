@@ -56,11 +56,6 @@
 #include "lcd_st7789_8bit.h"
 #endif
 
-
-#ifdef ACCEL_DEVICE_KX126
-#include "kx126_registers.h"
-#endif
-
 #include "stepcount.h"
 
 #ifdef GPS_PIN_RX
@@ -381,26 +376,8 @@ barometer readings.
 
 Same format as `Bangle.getPressure()`
 */
-/*JSON{
-  "type" : "event",
-  "class" : "Bangle",
-  "name" : "lcdPower",
-  "params" : [["on","bool","`true` if screen is on"]],
-  "ifdef" : "BANGLEJS"
-}
-Has the screen been turned on or off? Can be used to stop tasks that are no
-longer useful if nothing is displayed. Also see `Bangle.isLCDOn()`
-*/
-/*JSON{
-  "type" : "event",
-  "class" : "Bangle",
-  "name" : "backlight",
-  "params" : [["on","bool","`true` if backlight is on"]],
-  "ifdef" : "BANGLEJS"
-}
-Has the backlight been turned on or off? Can be used to stop tasks that are no
-longer useful if want to see in sun screen only. Also see `Bangle.isBacklightOn()`
-*/
+
+
 /*JSON{
   "type" : "event",
   "class" : "Bangle",
@@ -2951,38 +2928,6 @@ NO_INLINE void jswrap_banglejs_init() {
   banglejs_accel_init_impl(firstRun);
   if (firstRun) {
     unsigned char buf[2];
-  
-#ifdef ACCEL_DEVICE_KXTJ3_1057
-    // KXTJ3-1057 accelerometer init
-    jswrap_banglejs_accelWr(0x1B,0b00101000); // CNTL1 Off (top bit)
-    jswrap_banglejs_accelWr(0x1D,0x80); // CNTL2 Software reset
-    jshDelayMicroseconds(2000);
-    jswrap_banglejs_accelWr(0x21,0); // DATA_CTRL_REG - 12.5Hz out
-    jswrap_banglejs_accelWr(0x1B,0b00101000); // CNTL1 Off (top bit), low power, DRDYE=1, 4g, Wakeup=0,
-    jswrap_banglejs_accelWr(0x1B,0b10101000); // CNTL1 On (top bit), low power, DRDYE=1, 4g, Wakeup=0,
-#endif
-#ifdef ACCEL_DEVICE_KX126
-    // KX126_1063 accelerometer init
-    jswrap_banglejs_accelWr(KX126_CNTL1,0x00); // CNTL1 standby mode (top bit)
-    jswrap_banglejs_accelWr(KX126_CNTL2,KX126_CNTL2_SRST); // CNTL2 Software reset (top bit)
-    jshDelayMicroseconds(2000);
-    jswrap_banglejs_accelWr(KX126_CNTL3,KX126_CNTL3_OTP_12P5|KX126_CNTL3_OTDT_400|KX126_CNTL3_OWUF_0P781); // CNTL3 12.5Hz tilt, 400Hz tap, 0.781Hz motion detection
-    jswrap_banglejs_accelWr(KX126_ODCNTL,KX126_ODCNTL_OSA_12P5); // ODCNTL - 12.5Hz output data rate (ODR), with low-pass filter set to ODR/9
-    jswrap_banglejs_accelWr(KX126_INC1,0);      // INC1 - interrupt output pin INT1 disabled
-    jswrap_banglejs_accelWr(KX126_INC2,0);      // INC2 - wake-up & back-to-sleep ignores all 3 axes
-    jswrap_banglejs_accelWr(KX126_INC3,0x3F);   // INC3 - enable tap detection in all 6 directions
-    jswrap_banglejs_accelWr(KX126_INC4,0);      // INC4 - no routing of interrupt reporting to pin INT1
-    jswrap_banglejs_accelWr(KX126_INC5,0);      // INC5 - interrupt output pin INT2 disabled
-    jswrap_banglejs_accelWr(KX126_INC6,0);      // INC6 - no routing of interrupt reporting to pin INT2
-    jswrap_banglejs_accelWr(KX126_INC7,0);      // INC7 - no step counter interrupts reported on INT1 or INT2
-    jswrap_banglejs_accelWr(KX126_TDTRC,3);     // TDTRC - enable interrupts on single and double taps
-    jswrap_banglejs_accelWr(KX126_TDTC, 0x78);  // TDTC - tap detect double tap (0x78 default)
-    jswrap_banglejs_accelWr(KX126_TTH, 0xCB);   // TTH - tap detect threshold high (0xCB default)
-    jswrap_banglejs_accelWr(KX126_TTL, 0x22);   // TTL - tap detect threshold low (0x1A default)
-    jswrap_banglejs_accelWr(KX126_BUF_CLEAR,0); // clear the buffer
-    jswrap_banglejs_accelWr(KX126_CNTL1,KX126_CNTL1_DRDYE|KX126_CNTL1_GSEL_4G|KX126_CNTL1_TDTE); // CNTL1 - standby mode, low power, enable "data ready" interrupt, 4g, enable tap, disable tilt & pedometer (for now)
-    jswrap_banglejs_accelWr(KX126_CNTL1,KX126_CNTL1_DRDYE|KX126_CNTL1_GSEL_4G|KX126_CNTL1_TDTE|KX126_CNTL1_PC1); // CNTL1 - same as above but change from standby to operating mode
-#endif
 
 #ifdef PRESSURE_DEVICE
 #ifdef PRESSURE_DEVICE_HP203_EN
@@ -4172,12 +4117,6 @@ static void jswrap_banglejs_periph_off() {
 
   banglejs_accel_off_impl();
 
-#ifdef ACCEL_DEVICE_KXTJ3_1057
-  jswrap_banglejs_accelWr(0x1B,0); // accelerometer off
-#endif
-#ifdef ACCEL_DEVICE_KX126
-  jswrap_banglejs_accelWr(KX126_CNTL1,0); // CNTL1 Off (top bit)
-#endif
 #ifdef MAG_DEVICE_GMC303
   jswrap_banglejs_compassWr(0x31,0); // compass off
 #endif

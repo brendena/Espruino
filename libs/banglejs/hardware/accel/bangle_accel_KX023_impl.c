@@ -1,5 +1,5 @@
 #include "bangle_defines.h"
-
+#ifdef ACCEL_DEVICE_KX023
 const ESPR_cmd_i2c bangle_accel_KX023_init[] = {
     {ESPR_CMD_I2C_WRITE,0x18,0x0a}, // CNTL1 Off (top bit)
     {ESPR_CMD_I2C_WRITE,0x19,0x80}, // CNTL2 Software reset
@@ -42,3 +42,5 @@ void banglejs_accel_init_impl(bool firstRun){
 void banglejs_accel_off_impl(){
     jswrap_banglejs_accelWr(0x18,0x0a);
 }
+
+#endif

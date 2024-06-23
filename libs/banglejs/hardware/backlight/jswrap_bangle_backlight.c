@@ -116,7 +116,13 @@ void jswrap_banglejs_setLCDBrightness(JsVarFloat v) {
 }
 
 
-
-
-
-
+/*JSON{
+  "type" : "event",
+  "class" : "Bangle",
+  "name" : "backlight",
+  "params" : [["on","bool","`true` if backlight is on"]],
+  "ifdef" : "BANGLEJS"
+}
+Has the backlight been turned on or off? Can be used to stop tasks that are no
+longer useful if want to see in sun screen only. Also see `Bangle.isBacklightOn()`
+*/

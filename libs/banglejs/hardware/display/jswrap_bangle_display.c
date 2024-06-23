@@ -279,3 +279,16 @@ Also see the `Bangle.lcdPower` event
 int jswrap_banglejs_isLCDOn() {
   return (bangleFlags&JSBF_LCD_ON)!=0;
 }
+
+
+
+/*JSON{
+  "type" : "event",
+  "class" : "Bangle",
+  "name" : "lcdPower",
+  "params" : [["on","bool","`true` if screen is on"]],
+  "ifdef" : "BANGLEJS"
+}
+Has the screen been turned on or off? Can be used to stop tasks that are no
+longer useful if nothing is displayed. Also see `Bangle.isLCDOn()`
+*/

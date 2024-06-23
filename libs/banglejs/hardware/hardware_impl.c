@@ -9,6 +9,10 @@
 #include "display/bangle_lcd_lpm013M126_impl.c"
 #include "display/bangle_lcd_st7789_8bit_impl.c"
 
+//accel
+#include "accel/bangle_accel_KX023_impl.c"
+#include "accel/bangle_accel_KXTJ3_1057_impl.c"
+#include "accel/bangle_accel_KX126_impl.c"
 
 #ifdef BANGLEJS_Q3
     #include "hardware/devices/device_bangle.c"

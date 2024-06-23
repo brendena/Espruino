@@ -152,7 +152,7 @@ typedef struct ESPR_CMD_I2C{
   uint32_t data;
 }ESPR_cmd_i2c;
 
-#define SIZE_OF_CMD_I2C(arr) (sizeof(arr)/sizeof(ESPR_CMD_I2C))
+#define SIZE_OF_CMD_I2C(arr) (sizeof(arr)/sizeof(ESPR_cmd_i2c))
 
 
 #define ESPR_WEAK __attribute__((weak))
