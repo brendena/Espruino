@@ -2955,30 +2955,6 @@ JsVar *jswrap_banglejs_dbg() {
 
 
 
-/*JSON{
-    "type" : "staticmethod",
-    "class" : "Bangle",
-    "name" : "accelWr",
-    "generate" : "jswrap_banglejs_accelWr",
-    "params" : [
-      ["reg","int",""],
-      ["data","int",""]
-    ],
-    "ifdef" : "BANGLEJS"
-}
-Writes a register on the accelerometer
-*/
-void jswrap_banglejs_accelWr(JsVarInt reg, JsVarInt data) {
-#ifdef ACCEL_I2C
-  _jswrap_banglejs_i2cWr(ACCEL_I2C, ACCEL_ADDR, reg, data);
-#endif
-}
-
-
-
-
-
-
 
 /*JSON{
     "type" : "staticmethod",
@@ -3245,7 +3221,7 @@ static void jswrap_banglejs_periph_off() {
 
 #ifndef DICKENS // RB: the call to jswrap_banglejs_kill via jswInit can cause increased power draw
   jsiKill();
-  jsvKill();
+  0();
 #endif
   jshKill();
 

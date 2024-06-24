@@ -13,5 +13,6 @@ int    jswrap_banglejs_isBarometerOn();
 bool   jswrap_banglejs_barometerPoll();
 
 JsVar *jswrap_banglejs_getBarometerObject();
+JsVar *jswrap_banglejs_getPressure();
 
 extern JsVar *promisePressure;

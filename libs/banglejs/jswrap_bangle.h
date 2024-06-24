@@ -29,33 +29,42 @@ int jswrap_banglejs_isLocked();
 void jswrap_banglejs_setPollInterval(JsVarFloat interval);
 void jswrap_banglejs_setOptions(JsVar *options);
 JsVar *jswrap_banglejs_getOptions();
+
+
+//charging
 int jswrap_banglejs_isCharging();
 JsVarInt jswrap_banglejs_getBattery();
 
+//HRM
 bool jswrap_banglejs_setHRMPower(bool isOn, JsVar *appId);
 int jswrap_banglejs_isHRMOn();
+void jswrap_banglejs_hrmWr(JsVarInt reg, JsVarInt data);
+JsVar *jswrap_banglejs_hrmRd(JsVarInt reg, JsVarInt cnt);
+
+//GPS
 bool jswrap_banglejs_setGPSPower(bool isOn, JsVar *appId);
 int jswrap_banglejs_isGPSOn();
 JsVar *jswrap_banglejs_getGPSFix();
+
+//Beep
+void jswrap_banglejs_beep_callback(); // internal use only
+JsVar *jswrap_banglejs_beep(int time, int freq);
+void jswrap_banglejs_buzz_callback(); // internal use only
+JsVar *jswrap_banglejs_buzz(int time, JsVarFloat amt);
+
 
 
 int jswrap_banglejs_getStepCount();
 void jswrap_banglejs_setStepCount(JsVarInt count);
 
 
-JsVar *jswrap_banglejs_getPressure();
+
 JsVar *jswrap_banglejs_getHealthStatus();
 
 JsVar *jswrap_banglejs_dbg();
-void jswrap_banglejs_hrmWr(JsVarInt reg, JsVarInt data);
-JsVar *jswrap_banglejs_hrmRd(JsVarInt reg, JsVarInt cnt);
 void jswrap_banglejs_ioWr(JsVarInt mask, bool on);
 
 JsVar *jswrap_banglejs_project(JsVar *latlong);
-void jswrap_banglejs_beep_callback(); // internal use only
-JsVar *jswrap_banglejs_beep(int time, int freq);
-void jswrap_banglejs_buzz_callback(); // internal use only
-JsVar *jswrap_banglejs_buzz(int time, JsVarFloat amt);
 
 
 void jswrap_banglejs_off();
