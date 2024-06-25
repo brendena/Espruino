@@ -41,7 +41,7 @@ void banglejs_barometer_idle_impl(JsVar *bangle)
 }
 
 
-ESPR_WEAK bool banglejs_setBarometerPower(bool isOn, JsVar *appId){};
+
 ESPR_WEAK void banglejs_barometer_on_impl(){};
 ESPR_WEAK void banglejs_barometer_off_impl(){};
 ESPR_WEAK bool banglejs_barometer_get_data_impl(double *altitude, double *pressure, double *temperature){};

@@ -4,7 +4,7 @@
 void    banglejs_barometer_i2c_Wr(JsVarInt reg, JsVarInt data);
 JsVar * banglejs_barometer_i2c_Rd(JsVarInt reg, JsVarInt cnt);
 
-bool banglejs_setBarometerPower(bool isOn, JsVar *appId);
+
 void banglejs_barometer_on_impl();
 void banglejs_barometer_off_impl();
 
